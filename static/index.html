@@ -260,6 +260,14 @@
               <option value="RIGHT">Right Channel (Stereo Splitter)</option>
             </select>
           </div>
+          <div class="form-group">
+            <label>Filename Template Pattern</label>
+            <input type="text" id="cfg_filename_template_a" class="form-input" placeholder="%DT - %S - %C (%TG)">
+          </div>
+          <div class="form-group">
+            <label>TIT2 (Title) Tag Pattern</label>
+            <input type="text" id="cfg_tit2_template_a" class="form-input" placeholder="%C (%TG)">
+          </div>
         </div>
 
         <h3 style="font-size: 14px; margin-top: 16px; margin-bottom: 12px; color: var(--violet-accent);">Scanner B Settings</h3>
@@ -299,6 +307,14 @@
               <option value="RIGHT">Right Channel (Stereo Splitter)</option>
             </select>
           </div>
+          <div class="form-group">
+            <label>Filename Template Pattern</label>
+            <input type="text" id="cfg_filename_template_b" class="form-input" placeholder="%DT - %S - %C (%TG)">
+          </div>
+          <div class="form-group">
+            <label>TIT2 (Title) Tag Pattern</label>
+            <input type="text" id="cfg_tit2_template_b" class="form-input" placeholder="%C (%TG)">
+          </div>
         </div>
 
         <h3 style="font-size: 14px; margin-top: 16px; margin-bottom: 12px; color: var(--emerald-recv);">📡 ScanScribe Pipeline Feeder Settings</h3>
@@ -324,7 +340,10 @@
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px;">
-          <button type="button" class="btn btn-outline" style="color: var(--cyan-accent);" onclick="testScanScribeFeeder()">📡 Send Test Feed to ScanScribe</button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-outline" style="color: var(--cyan-accent);" onclick="testScanScribeFeeder('scanner_a')">📡 Test Scanner A</button>
+            <button type="button" class="btn btn-outline" style="color: var(--violet-accent);" onclick="testScanScribeFeeder('scanner_b')">📡 Test Scanner B</button>
+          </div>
           <div style="display: flex; gap: 12px;">
             <button type="button" class="btn btn-outline" onclick="closeSettingsModal()">Cancel</button>
             <button type="submit" class="btn btn-primary">Save & Apply</button>

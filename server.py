@@ -225,11 +225,18 @@ async def api_update_feeder_config(new_feeder_cfg: ScanScribeFeederConfig):
     sync_manager.feeder.update_config(new_feeder_cfg)
     return {"status": "success", "feeder_config": config.feeder.model_dump()}
 
+class FeederTestRequest(BaseModel):
+    scanner_id: str = "scanner_a"
+
 @app.post("/api/feeder/dispatch_test")
-async def api_dispatch_feeder_test():
+async def api_dispatch_feeder_test(req: Optional[FeederTestRequest] = None, scanner_id: Optional[str] = None):
+    target_id = (req.scanner_id if req else None) or scanner_id or "scanner_a"
+    if target_id not in ("scanner_a", "scanner_b"):
+        target_id = "scanner_a"
+    sc_cfg = config.scanner_a if target_id == "scanner_a" else config.scanner_b
     payload = CallTransmissionPayload(
-        scanner_id="scanner_a",
-        scanner_model=config.scanner_a.model.value,
+        scanner_id=target_id,
+        scanner_model=sc_cfg.model.value,
         system_name="Metropolitan P25 Trunk",
         department_name="Fire & Rescue",
         channel_name="Dispatch North",
@@ -237,10 +244,12 @@ async def api_dispatch_feeder_test():
         frequency=851.2500,
         rssi=5,
         duration_seconds=5.4,
-        timestamp=time.time()
+        timestamp=time.time(),
+        filename_template=getattr(sc_cfg, "filename_template", None),
+        tit2_template=getattr(sc_cfg, "tit2_template", None)
     )
     result = sync_manager.feeder.dispatch_call(payload)
-    return {"status": "success", "dispatch_result": result}
+    return {"status": "success", "scanner_id": target_id, "dispatch_result": result}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

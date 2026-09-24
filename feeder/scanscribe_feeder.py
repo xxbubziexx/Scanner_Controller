@@ -36,6 +36,8 @@ class CallTransmissionPayload(BaseModel):
     timestamp: float = 0.0
     duration_seconds: float = 0.0
     audio_pcm: Optional[bytes] = None
+    filename_template: Optional[str] = None
+    tit2_template: Optional[str] = None
 
 class ScanScribeFeeder:
     """
@@ -43,11 +45,46 @@ class ScanScribeFeeder:
     and dispatches them directly to the ScanScribe audio transcription pipeline.
     """
 
-    def __init__(self, config: ScanScribeFeederConfig):
+    def __init__(self, config: ScanScribeFeederConfig, scanner_configs: Optional[Dict[str, Any]] = None):
         self.config: ScanScribeFeederConfig = config
+        self.scanner_configs: Dict[str, Any] = scanner_configs or {}
 
     def update_config(self, new_config: ScanScribeFeederConfig):
         self.config = new_config
+
+    def update_scanner_configs(self, scanner_configs: Dict[str, Any]):
+        self.scanner_configs = scanner_configs or {}
+
+    def get_scanner_templates(self, payload: CallTransmissionPayload) -> Tuple[str, str]:
+        """
+        Resolves (filename_template, tit2_template) specifically for the payload's scanner.
+        Priority:
+          1. Payload explicit override (if provided and non-empty)
+          2. Per-scanner configuration from self.scanner_configs[payload.scanner_id]
+          3. Feeder configuration default
+          4. Built-in default
+        """
+        sc_cfg = self.scanner_configs.get(payload.scanner_id) if hasattr(self, "scanner_configs") and self.scanner_configs else None
+
+        # Resolve filename template
+        filename_tmpl = payload.filename_template
+        if not filename_tmpl and sc_cfg:
+            filename_tmpl = getattr(sc_cfg, "filename_template", None)
+        if not filename_tmpl:
+            filename_tmpl = getattr(self.config, "filename_template", None)
+        if not filename_tmpl:
+            filename_tmpl = "%DT - %S - %C (%TG)"
+
+        # Resolve TIT2 tag template
+        tit2_tmpl = payload.tit2_template
+        if not tit2_tmpl and sc_cfg:
+            tit2_tmpl = getattr(sc_cfg, "tit2_template", None)
+        if not tit2_tmpl:
+            tit2_tmpl = getattr(self.config, "tit2_template", None)
+        if not tit2_tmpl:
+            tit2_tmpl = filename_tmpl or "%C (%TG)"
+
+        return filename_tmpl, tit2_tmpl
 
     def _build_proscan_metadata(self, payload: CallTransmissionPayload) -> ProScanMetadata:
         dt = datetime.datetime.fromtimestamp(payload.timestamp or time.time())
@@ -79,7 +116,7 @@ class ScanScribeFeeder:
             rssi=str(payload.rssi) if payload.rssi is not None else ""
         )
 
-    def _generate_audio_bytes(self, payload: CallTransmissionPayload, meta: ProScanMetadata) -> Tuple[bytes, str]:
+    def _generate_audio_bytes(self, payload: CallTransmissionPayload, meta: ProScanMetadata, tit2_template: Optional[str] = None) -> Tuple[bytes, str]:
         """Generate ProScan-tagged audio bytes (MP3 or WAV) and return (bytes, file_extension)"""
         pcm = payload.audio_pcm if payload.audio_pcm else (b"\x00\x00" * 8000 * 3)
         requested_ext = self.config.audio_format.lower()
@@ -88,7 +125,8 @@ class ScanScribeFeeder:
         # Check if payload is already encoded MP3
         is_mp3_payload = pcm.startswith(b"ID3") or (len(pcm) > 2 and pcm[0] == 0xFF and (pcm[1] & 0xE0) == 0xE0)
 
-        tit2_template = getattr(self.config, "tit2_template", None) or self.config.filename_template or "%C (%TG)"
+        if not tit2_template:
+            _, tit2_template = self.get_scanner_templates(payload)
 
         if requested_ext == "mp3":
             if is_mp3_payload:
@@ -147,14 +185,14 @@ class ScanScribeFeeder:
         dt = datetime.datetime.fromtimestamp(payload.timestamp)
 
         meta = self._build_proscan_metadata(payload)
-        template = self.config.filename_template if self.config.filename_template else "%DT - %S - %C (%TG)"
-        formatted_stem = format_template(template, meta, dt)
+        filename_template, tit2_template = self.get_scanner_templates(payload)
+        formatted_stem = format_template(filename_template, meta, dt)
         filename_base = sanitize_filename(formatted_stem)
 
         # Mode 1: Directory Drop Feeder
         if self.config.feeder_mode == FeederMode.DIRECTORY_DROP:
             target_dir = self._resolve_inbox_directory()
-            audio_bytes, ext = self._generate_audio_bytes(payload, meta)
+            audio_bytes, ext = self._generate_audio_bytes(payload, meta, tit2_template=tit2_template)
             final_filename = resolve_collision_filename(target_dir, filename_base, ext)
 
             chan_name = meta.channel_name
@@ -239,7 +277,7 @@ class ScanScribeFeeder:
         # Mode 2: HTTP Webhook Ingest Feeder
         elif self.config.feeder_mode == FeederMode.HTTP_WEBHOOK:
             try:
-                audio_bytes, ext = self._generate_audio_bytes(payload, meta)
+                audio_bytes, ext = self._generate_audio_bytes(payload, meta, tit2_template=tit2_template)
                 chan_name = meta.channel_name
                 sys_name = meta.system_name
                 dept_name = meta.department_name

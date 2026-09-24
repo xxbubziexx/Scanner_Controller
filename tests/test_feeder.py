@@ -149,6 +149,83 @@ class TestScanScribeFeeder(unittest.TestCase):
         self.assertIn(b"INAM", audio_bytes)
         self.assertIn(b"1201 - FIRE-TAC1", audio_bytes)
 
+    def test_per_scanner_filename_and_tit2_templates(self):
+        from config import ScannerConfig, ScannerModel
+        cfg_a = ScannerConfig(
+            id="scanner_a",
+            name="Scanner A",
+            model=ScannerModel.BCD436HP,
+            filename_template="%ST_%C_%TG",
+            tit2_template="%C [%TG]"
+        )
+        cfg_b = ScannerConfig(
+            id="scanner_b",
+            name="Scanner B",
+            model=ScannerModel.BCD996P2,
+            filename_template="%S_%DE_%C",
+            tit2_template="%S - %C"
+        )
+        self.feeder.update_scanner_configs({"scanner_a": cfg_a, "scanner_b": cfg_b})
+        self.config.audio_format = "WAV"
+
+        # Dispatch call from Scanner A
+        payload_a = CallTransmissionPayload(
+            scanner_id="scanner_a",
+            scanner_model="BCD436HP",
+            system_name="Metro P25",
+            department_name="Fire",
+            channel_name="Fire Main",
+            tgid="101",
+            duration_seconds=2.0
+        )
+        res_a = self.feeder.dispatch_call(payload_a)
+        self.assertEqual(res_a["status"], "success")
+        base_a = os.path.basename(res_a["audio_file"])
+        self.assertTrue(base_a.startswith("BCD436HP_Fire Main_101"))
+
+        with open(res_a["audio_file"], "rb") as f:
+            bytes_a = f.read()
+        self.assertIn(b"Fire Main [101]", bytes_a)
+
+        # Dispatch call from Scanner B
+        payload_b = CallTransmissionPayload(
+            scanner_id="scanner_b",
+            scanner_model="BCD996P2",
+            system_name="County Trunk",
+            department_name="Police",
+            channel_name="Dispatch North",
+            tgid="202",
+            duration_seconds=2.0
+        )
+        res_b = self.feeder.dispatch_call(payload_b)
+        self.assertEqual(res_b["status"], "success")
+        base_b = os.path.basename(res_b["audio_file"])
+        self.assertTrue(base_b.startswith("County Trunk_Police_Dispatch North"))
+
+        with open(res_b["audio_file"], "rb") as f:
+            bytes_b = f.read()
+        self.assertIn(b"County Trunk - Dispatch North", bytes_b)
+
+    def test_payload_explicit_template_override(self):
+        self.config.audio_format = "WAV"
+        payload = CallTransmissionPayload(
+            scanner_id="scanner_a",
+            scanner_model="BCD436HP",
+            system_name="Custom Sys",
+            channel_name="Custom Chan",
+            tgid="999",
+            duration_seconds=1.0,
+            filename_template="OVERRIDE_%C_%TG",
+            tit2_template="OVERRIDE_TITLE_%C"
+        )
+        res = self.feeder.dispatch_call(payload)
+        base = os.path.basename(res["audio_file"])
+        self.assertTrue(base.startswith("OVERRIDE_Custom Chan_999"))
+
+        with open(res["audio_file"], "rb") as f:
+            audio_bytes = f.read()
+        self.assertIn(b"OVERRIDE_TITLE_Custom Chan", audio_bytes)
+
 if __name__ == "__main__":
     unittest.main()
 

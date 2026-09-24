@@ -69,7 +69,10 @@ class SyncManager:
         self.active_exclusions: Dict[str, Dict[str, Any]] = {}
 
         # ScanScribe Feeder & Hardware Audio Recorder
-        self.feeder = ScanScribeFeeder(self.config.feeder)
+        self.feeder = ScanScribeFeeder(
+            self.config.feeder,
+            {"scanner_a": self.config.scanner_a, "scanner_b": self.config.scanner_b}
+        )
         self._dispatch_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="AudioDispatch")
         self.audio_recorder = ScannerAudioRecorder(
             sample_rate=self.config.feeder.sample_rate,
@@ -148,6 +151,7 @@ class SyncManager:
             target_rate = self.config.feeder.sample_rate or 16000
             dispatch_pcm = resample_pcm_int16(pcm_bytes, in_rate, target_rate)
 
+            sc_cfg = self.config.scanner_a if scanner_id == "scanner_a" else self.config.scanner_b
             payload = CallTransmissionPayload(
                 scanner_id=scanner_id,
                 scanner_model=status.model,
@@ -160,7 +164,9 @@ class SyncManager:
                 rssi=status.rssi,
                 timestamp=time.time(),
                 duration_seconds=duration,
-                audio_pcm=dispatch_pcm
+                audio_pcm=dispatch_pcm,
+                filename_template=getattr(sc_cfg, "filename_template", None),
+                tit2_template=getattr(sc_cfg, "tit2_template", None)
             )
             res = self.feeder.dispatch_call(payload)
             logger.info(f"ScanScribe Audio Dispatch [{scanner_id}]: {res.get('status')} -> {res.get('audio_file', '')}")
@@ -200,6 +206,7 @@ class SyncManager:
     def update_config(self, new_config: AppConfig):
         self.config = new_config
         self.feeder.update_config(new_config.feeder)
+        self.feeder.update_scanner_configs({"scanner_a": new_config.scanner_a, "scanner_b": new_config.scanner_b})
         self.audio_recorder.hang_time_seconds = new_config.sync.hang_time_seconds
         self._configure_audio_streams()
         self.initialize_drivers()

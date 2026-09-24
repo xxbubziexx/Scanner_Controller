@@ -621,6 +621,20 @@ function openSettingsModal() {
         updateBaudOptions('a');
         updateBaudOptions('b');
 
+        if (document.getElementById("cfg_filename_template_a")) {
+          document.getElementById("cfg_filename_template_a").value = cfg.scanner_a.filename_template || "%DT - %S - %C (%TG)";
+        }
+        if (document.getElementById("cfg_tit2_template_a")) {
+          document.getElementById("cfg_tit2_template_a").value = cfg.scanner_a.tit2_template || "%C (%TG)";
+        }
+
+        if (document.getElementById("cfg_filename_template_b")) {
+          document.getElementById("cfg_filename_template_b").value = cfg.scanner_b.filename_template || "%DT - %S - %C (%TG)";
+        }
+        if (document.getElementById("cfg_tit2_template_b")) {
+          document.getElementById("cfg_tit2_template_b").value = cfg.scanner_b.tit2_template || "%C (%TG)";
+        }
+
         if (cfg.feeder) {
           document.getElementById("cfg_feeder_mode").value = cfg.feeder.feeder_mode;
           document.getElementById("cfg_feeder_format").value = cfg.feeder.audio_format;
@@ -683,6 +697,22 @@ function saveConfiguration(event) {
   cfg.scanner_b.audio_device_index = (audDevB === "DISABLED" || audDevB === "") ? null : parseInt(audDevB);
   cfg.scanner_b.audio_channel = document.getElementById("cfg_audio_ch_b").value;
 
+  // Scanner A Templates
+  if (document.getElementById("cfg_filename_template_a")) {
+    cfg.scanner_a.filename_template = document.getElementById("cfg_filename_template_a").value.trim() || "%DT - %S - %C (%TG)";
+  }
+  if (document.getElementById("cfg_tit2_template_a")) {
+    cfg.scanner_a.tit2_template = document.getElementById("cfg_tit2_template_a").value.trim() || "%C (%TG)";
+  }
+
+  // Scanner B Templates
+  if (document.getElementById("cfg_filename_template_b")) {
+    cfg.scanner_b.filename_template = document.getElementById("cfg_filename_template_b").value.trim() || "%DT - %S - %C (%TG)";
+  }
+  if (document.getElementById("cfg_tit2_template_b")) {
+    cfg.scanner_b.tit2_template = document.getElementById("cfg_tit2_template_b").value.trim() || "%C (%TG)";
+  }
+
   if (cfg.feeder) {
     cfg.feeder.feeder_mode = document.getElementById("cfg_feeder_mode").value;
     cfg.feeder.audio_format = document.getElementById("cfg_feeder_format").value;
@@ -741,14 +771,19 @@ function populateAudioDeviceDropdowns() {
   if (chB && cfgB.audio_channel) chB.value = cfgB.audio_channel;
 }
 
-function testScanScribeFeeder() {
-  fetch('/api/feeder/dispatch_test', { method: 'POST' })
+function testScanScribeFeeder(scannerId) {
+  const targetId = scannerId || 'scanner_a';
+  fetch('/api/feeder/dispatch_test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scanner_id: targetId })
+  })
     .then(res => res.json())
     .then(data => {
-      if (data.status === "success" && data.dispatch_result.status === "success") {
-        alert(`Dispatched Test Audio Feed to ScanScribe Inbox!\nAudio: ${data.dispatch_result.audio_file}`);
+      if (data.status === "success" && data.dispatch_result && data.dispatch_result.status === "success") {
+        alert(`Dispatched Test Audio Feed [${targetId.toUpperCase()}] to ScanScribe Inbox!\nAudio: ${data.dispatch_result.audio_file}`);
       } else {
-        alert(`Feeder Dispatch Result: ${JSON.stringify(data.dispatch_result)}`);
+        alert(`Feeder Dispatch Result [${targetId.toUpperCase()}]: ${JSON.stringify(data.dispatch_result)}`);
       }
     });
 }

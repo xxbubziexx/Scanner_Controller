@@ -784,86 +784,160 @@ class ScannerControllerApp(ctk.CTk):
             self.switch_sidecar_json.deselect()
         self.switch_sidecar_json.pack(side="left")
 
-        # ProScan Custom Filename Pattern Template Section
-        fmt_card = ctk.CTkFrame(frame, fg_color="#0F172A", corner_radius=8, border_width=1, border_color="#334155")
-        fmt_card.pack(fill="x", padx=16, pady=8)
+        self.switch_sidecar_json.pack(side="left")
 
-        row_fmt_title = ctk.CTkFrame(fmt_card, fg_color="transparent")
-        row_fmt_title.pack(fill="x", padx=12, pady=(10, 4))
-        ctk.CTkLabel(
-            row_fmt_title,
-            text="🏷️ ProScan Filename & TIT2 (Title) Tag Patterns (%TG, %D, %T, %C, %S...)",
+        # --- Scanner A Filename & TIT2 Patterns Card ---
+        fmt_card_a = ctk.CTkFrame(frame, fg_color="#0F172A", corner_radius=8, border_width=1, border_color="#0284C7")
+        fmt_card_a.pack(fill="x", padx=16, pady=6)
+
+        row_a_title = ctk.CTkFrame(fmt_card_a, fg_color="transparent")
+        row_a_title.pack(fill="x", padx=12, pady=(8, 2))
+        self.lbl_card_a_title = ctk.CTkLabel(
+            row_a_title,
+            text=f"📡 Scanner A ({self.config.scanner_a.model.value}) — Filename Template & TIT2 Title Tag",
             font=ctk.CTkFont(size=12, weight="bold"),
             text_color="#38BDF8"
-        ).pack(side="left")
+        )
+        self.lbl_card_a_title.pack(side="left")
 
-        row_template = ctk.CTkFrame(fmt_card, fg_color="transparent")
-        row_template.pack(fill="x", padx=12, pady=4)
-        ctk.CTkLabel(row_template, text="Filename Template:", font=ctk.CTkFont(weight="bold"), width=150, anchor="w").pack(side="left")
+        # Scanner A Filename Row
+        row_tmpl_a = ctk.CTkFrame(fmt_card_a, fg_color="transparent")
+        row_tmpl_a.pack(fill="x", padx=12, pady=3)
+        ctk.CTkLabel(row_tmpl_a, text="Filename Template:", font=ctk.CTkFont(weight="bold"), width=140, anchor="w").pack(side="left")
+        self.entry_filename_template_a = ctk.CTkEntry(row_tmpl_a)
+        tmpl_a_val = getattr(self.config.scanner_a, "filename_template", None) or getattr(self.config.feeder, "filename_template", "%DT - %S - %C") or "%DT - %S - %C"
+        self.entry_filename_template_a.insert(0, tmpl_a_val)
+        self.entry_filename_template_a.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.entry_filename_template_a.bind("<KeyRelease>", lambda e: self._update_filename_preview("scanner_a"))
 
-        self.entry_filename_template = ctk.CTkEntry(row_template)
-        tmpl_val = getattr(self.config.feeder, "filename_template", "%DT - %S - %C") or "%DT - %S - %C"
-        self.entry_filename_template.insert(0, tmpl_val)
-        self.entry_filename_template.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        self.entry_filename_template.bind("<KeyRelease>", self._update_filename_preview)
+        btn_pa1 = ctk.CTkButton(row_tmpl_a, text="Default (%DT - %S - %C)", width=145, height=24, fg_color="#334155", hover_color="#475569", command=lambda: self._set_filename_preset("scanner_a", "%DT - %S - %C"))
+        btn_pa1.pack(side="left", padx=2)
+        btn_pa2 = ctk.CTkButton(row_tmpl_a, text="Full (%DT_%ST_%S_%C_%TG)", width=150, height=24, fg_color="#334155", hover_color="#475569", command=lambda: self._set_filename_preset("scanner_a", "%DT_%ST_%S_%C_%TG"))
+        btn_pa2.pack(side="left", padx=2)
+        btn_pa3 = ctk.CTkButton(row_tmpl_a, text="%TT %D %C", width=95, height=24, fg_color="#0284C7", hover_color="#0369A1", command=lambda: self._set_filename_preset("scanner_a", "%TT %D %C"))
+        btn_pa3.pack(side="left", padx=2)
 
-        # Quick Presets
-        btn_p1 = ctk.CTkButton(row_template, text="Default (%DT - %S - %C)", width=145, height=26, fg_color="#334155", hover_color="#475569", command=lambda: self._set_filename_preset("%DT - %S - %C"))
-        btn_p1.pack(side="left", padx=2)
-        btn_p2 = ctk.CTkButton(row_template, text="Full (%DT_%ST_%S_%C_%TG)", width=150, height=26, fg_color="#334155", hover_color="#475569", command=lambda: self._set_filename_preset("%DT_%ST_%S_%C_%TG"))
-        btn_p2.pack(side="left", padx=2)
-        btn_p3 = ctk.CTkButton(row_template, text="%TT %D %C", width=100, height=26, fg_color="#0284C7", hover_color="#0369A1", command=lambda: self._set_filename_preset("%TT %D %C"))
-        btn_p3.pack(side="left", padx=2)
-
-        # Live Sample Filename Preview
-        row_prev = ctk.CTkFrame(fmt_card, fg_color="transparent")
-        row_prev.pack(fill="x", padx=12, pady=(2, 6))
-        self.lbl_filename_preview = ctk.CTkLabel(
-            row_prev,
-            text="Preview: ...",
+        # Scanner A Filename Preview
+        row_prev_a = ctk.CTkFrame(fmt_card_a, fg_color="transparent")
+        row_prev_a.pack(fill="x", padx=12, pady=(1, 4))
+        self.lbl_filename_preview_a = ctk.CTkLabel(
+            row_prev_a,
+            text="Scanner A Preview: ...",
             font=ctk.CTkFont(size=11, family="Consolas", weight="bold"),
             text_color="#38BDF8",
             anchor="w"
         )
-        self.lbl_filename_preview.pack(fill="x")
+        self.lbl_filename_preview_a.pack(fill="x")
 
-        # Row: TIT2 Tag Template
-        row_tit2 = ctk.CTkFrame(fmt_card, fg_color="transparent")
-        row_tit2.pack(fill="x", padx=12, pady=4)
-        ctk.CTkLabel(row_tit2, text="TIT2 (Title) Tag:", font=ctk.CTkFont(weight="bold"), width=150, anchor="w").pack(side="left")
+        # Scanner A TIT2 Row
+        row_tit2_a = ctk.CTkFrame(fmt_card_a, fg_color="transparent")
+        row_tit2_a.pack(fill="x", padx=12, pady=3)
+        ctk.CTkLabel(row_tit2_a, text="TIT2 (Title) Tag:", font=ctk.CTkFont(weight="bold"), width=140, anchor="w").pack(side="left")
+        self.entry_tit2_template_a = ctk.CTkEntry(row_tit2_a)
+        tit2_a_val = getattr(self.config.scanner_a, "tit2_template", None) or getattr(self.config.feeder, "tit2_template", "%C (%TG)") or "%C (%TG)"
+        self.entry_tit2_template_a.insert(0, tit2_a_val)
+        self.entry_tit2_template_a.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.entry_tit2_template_a.bind("<KeyRelease>", lambda e: self._update_tit2_preview("scanner_a"))
 
-        self.entry_tit2_template = ctk.CTkEntry(row_tit2)
-        tit2_val = getattr(self.config.feeder, "tit2_template", "%C (%TG)") or "%C (%TG)"
-        self.entry_tit2_template.insert(0, tit2_val)
-        self.entry_tit2_template.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        self.entry_tit2_template.bind("<KeyRelease>", self._update_tit2_preview)
+        btn_ta1 = ctk.CTkButton(row_tit2_a, text="Default (%C (%TG))", width=145, height=24, fg_color="#334155", hover_color="#475569", command=lambda: self._set_tit2_preset("scanner_a", "%C (%TG)"))
+        btn_ta1.pack(side="left", padx=2)
+        btn_ta2 = ctk.CTkButton(row_tit2_a, text="TG/Tone (%TG - %C - %T)", width=150, height=24, fg_color="#334155", hover_color="#475569", command=lambda: self._set_tit2_preset("scanner_a", "%TG - %C - %T"))
+        btn_ta2.pack(side="left", padx=2)
+        btn_ta3 = ctk.CTkButton(row_tit2_a, text="%TG %G %C", width=95, height=24, fg_color="#0284C7", hover_color="#0369A1", command=lambda: self._set_tit2_preset("scanner_a", "%TG %G %C"))
+        btn_ta3.pack(side="left", padx=2)
 
-        # Quick Presets for TIT2
-        btn_t1 = ctk.CTkButton(row_tit2, text="Default (%C (%TG))", width=145, height=26, fg_color="#334155", hover_color="#475569", command=lambda: self._set_tit2_preset("%C (%TG)"))
-        btn_t1.pack(side="left", padx=2)
-        btn_t2 = ctk.CTkButton(row_tit2, text="TG/Tone (%TG - %C - %T)", width=150, height=26, fg_color="#334155", hover_color="#475569", command=lambda: self._set_tit2_preset("%TG - %C - %T"))
-        btn_t2.pack(side="left", padx=2)
-        btn_t3 = ctk.CTkButton(row_tit2, text="%TG %G %C", width=100, height=26, fg_color="#0284C7", hover_color="#0369A1", command=lambda: self._set_tit2_preset("%TG %G %C"))
-        btn_t3.pack(side="left", padx=2)
-
-        # Live Sample TIT2 Preview
-        row_tit2_prev = ctk.CTkFrame(fmt_card, fg_color="transparent")
-        row_tit2_prev.pack(fill="x", padx=12, pady=(2, 6))
-        self.lbl_tit2_preview = ctk.CTkLabel(
-            row_tit2_prev,
-            text="TIT2 Tag Preview: ...",
+        # Scanner A TIT2 Preview
+        row_tit2_prev_a = ctk.CTkFrame(fmt_card_a, fg_color="transparent")
+        row_tit2_prev_a.pack(fill="x", padx=12, pady=(1, 8))
+        self.lbl_tit2_preview_a = ctk.CTkLabel(
+            row_tit2_prev_a,
+            text="Scanner A TIT2 Preview: ...",
             font=ctk.CTkFont(size=11, family="Consolas", weight="bold"),
             text_color="#A78BFA",
             anchor="w"
         )
-        self.lbl_tit2_preview.pack(fill="x")
+        self.lbl_tit2_preview_a.pack(fill="x")
 
-        self._update_filename_preview()
-        self._update_tit2_preview()
+        # --- Scanner B Filename & TIT2 Patterns Card ---
+        fmt_card_b = ctk.CTkFrame(frame, fg_color="#0F172A", corner_radius=8, border_width=1, border_color="#7C3AED")
+        fmt_card_b.pack(fill="x", padx=16, pady=6)
+
+        row_b_title = ctk.CTkFrame(fmt_card_b, fg_color="transparent")
+        row_b_title.pack(fill="x", padx=12, pady=(8, 2))
+        self.lbl_card_b_title = ctk.CTkLabel(
+            row_b_title,
+            text=f"📡 Scanner B ({self.config.scanner_b.model.value}) — Filename Template & TIT2 Title Tag",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#C084FC"
+        )
+        self.lbl_card_b_title.pack(side="left")
+
+        # Scanner B Filename Row
+        row_tmpl_b = ctk.CTkFrame(fmt_card_b, fg_color="transparent")
+        row_tmpl_b.pack(fill="x", padx=12, pady=3)
+        ctk.CTkLabel(row_tmpl_b, text="Filename Template:", font=ctk.CTkFont(weight="bold"), width=140, anchor="w").pack(side="left")
+        self.entry_filename_template_b = ctk.CTkEntry(row_tmpl_b)
+        tmpl_b_val = getattr(self.config.scanner_b, "filename_template", None) or "%DT - %S - %C (%TG)"
+        self.entry_filename_template_b.insert(0, tmpl_b_val)
+        self.entry_filename_template_b.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.entry_filename_template_b.bind("<KeyRelease>", lambda e: self._update_filename_preview("scanner_b"))
+
+        btn_pb1 = ctk.CTkButton(row_tmpl_b, text="Default (%DT - %S - %C)", width=145, height=24, fg_color="#334155", hover_color="#475569", command=lambda: self._set_filename_preset("scanner_b", "%DT - %S - %C"))
+        btn_pb1.pack(side="left", padx=2)
+        btn_pb2 = ctk.CTkButton(row_tmpl_b, text="Full (%DT_%ST_%S_%C_%TG)", width=150, height=24, fg_color="#334155", hover_color="#475569", command=lambda: self._set_filename_preset("scanner_b", "%DT_%ST_%S_%C_%TG"))
+        btn_pb2.pack(side="left", padx=2)
+        btn_pb3 = ctk.CTkButton(row_tmpl_b, text="%TT %D %C", width=95, height=24, fg_color="#7C3AED", hover_color="#6D28D9", command=lambda: self._set_filename_preset("scanner_b", "%TT %D %C"))
+        btn_pb3.pack(side="left", padx=2)
+
+        # Scanner B Filename Preview
+        row_prev_b = ctk.CTkFrame(fmt_card_b, fg_color="transparent")
+        row_prev_b.pack(fill="x", padx=12, pady=(1, 4))
+        self.lbl_filename_preview_b = ctk.CTkLabel(
+            row_prev_b,
+            text="Scanner B Preview: ...",
+            font=ctk.CTkFont(size=11, family="Consolas", weight="bold"),
+            text_color="#C084FC",
+            anchor="w"
+        )
+        self.lbl_filename_preview_b.pack(fill="x")
+
+        # Scanner B TIT2 Row
+        row_tit2_b = ctk.CTkFrame(fmt_card_b, fg_color="transparent")
+        row_tit2_b.pack(fill="x", padx=12, pady=3)
+        ctk.CTkLabel(row_tit2_b, text="TIT2 (Title) Tag:", font=ctk.CTkFont(weight="bold"), width=140, anchor="w").pack(side="left")
+        self.entry_tit2_template_b = ctk.CTkEntry(row_tit2_b)
+        tit2_b_val = getattr(self.config.scanner_b, "tit2_template", None) or "%C (%TG)"
+        self.entry_tit2_template_b.insert(0, tit2_b_val)
+        self.entry_tit2_template_b.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.entry_tit2_template_b.bind("<KeyRelease>", lambda e: self._update_tit2_preview("scanner_b"))
+
+        btn_tb1 = ctk.CTkButton(row_tit2_b, text="Default (%C (%TG))", width=145, height=24, fg_color="#334155", hover_color="#475569", command=lambda: self._set_tit2_preset("scanner_b", "%C (%TG)"))
+        btn_tb1.pack(side="left", padx=2)
+        btn_tb2 = ctk.CTkButton(row_tit2_b, text="TG/Tone (%TG - %C - %T)", width=150, height=24, fg_color="#334155", hover_color="#475569", command=lambda: self._set_tit2_preset("scanner_b", "%TG - %C - %T"))
+        btn_tb2.pack(side="left", padx=2)
+        btn_tb3 = ctk.CTkButton(row_tit2_b, text="%TG %G %C", width=95, height=24, fg_color="#7C3AED", hover_color="#6D28D9", command=lambda: self._set_tit2_preset("scanner_b", "%TG %G %C"))
+        btn_tb3.pack(side="left", padx=2)
+
+        # Scanner B TIT2 Preview
+        row_tit2_prev_b = ctk.CTkFrame(fmt_card_b, fg_color="transparent")
+        row_tit2_prev_b.pack(fill="x", padx=12, pady=(1, 8))
+        self.lbl_tit2_preview_b = ctk.CTkLabel(
+            row_tit2_prev_b,
+            text="Scanner B TIT2 Preview: ...",
+            font=ctk.CTkFont(size=11, family="Consolas", weight="bold"),
+            text_color="#E9D5FF",
+            anchor="w"
+        )
+        self.lbl_tit2_preview_b.pack(fill="x")
+
+        self._update_filename_preview("scanner_a")
+        self._update_filename_preview("scanner_b")
+        self._update_tit2_preview("scanner_a")
+        self._update_tit2_preview("scanner_b")
 
         # ProScan Specifiers Reference Card
-        ref_card = ctk.CTkFrame(fmt_card, fg_color="#1E293B", corner_radius=6)
-        ref_card.pack(fill="x", padx=12, pady=(4, 10))
+        ref_card = ctk.CTkFrame(frame, fg_color="#1E293B", corner_radius=6)
+        ref_card.pack(fill="x", padx=16, pady=(4, 10))
 
         spec_help = (
             "ProScan Custom Formatters (General.cs:33805 — 100% Bit-Exact Match):\n"
@@ -910,19 +984,29 @@ class ScannerControllerApp(ctk.CTk):
         act_row = ctk.CTkFrame(frame, fg_color="transparent")
         act_row.pack(fill="x", padx=16, pady=(16, 12))
 
-        btn_test = ctk.CTkButton(
+        btn_test_a = ctk.CTkButton(
             act_row,
-            text="🚀 Dispatch Test Transmission",
+            text="🚀 Test Scanner A Feed",
             font=ctk.CTkFont(size=12, weight="bold"),
-            fg_color="#3B82F6",
-            hover_color="#2563EB",
-            command=self._dispatch_test_feeder
+            fg_color="#0284C7",
+            hover_color="#0369A1",
+            command=lambda: self._dispatch_test_feeder("scanner_a")
         )
-        btn_test.pack(side="left")
+        btn_test_a.pack(side="left", padx=(0, 8))
+
+        btn_test_b = ctk.CTkButton(
+            act_row,
+            text="🚀 Test Scanner B Feed",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#7C3AED",
+            hover_color="#6D28D9",
+            command=lambda: self._dispatch_test_feeder("scanner_b")
+        )
+        btn_test_b.pack(side="left")
 
         btn_save_feeder = ctk.CTkButton(
             act_row,
-            text="💾 Save Feeder Config",
+            text="💾 Save Feeder & Scanner Configs",
             font=ctk.CTkFont(size=12, weight="bold"),
             fg_color="#059669",
             hover_color="#047857",
@@ -931,6 +1015,7 @@ class ScannerControllerApp(ctk.CTk):
         btn_save_feeder.pack(side="right")
 
         self._update_filename_preview()
+
 
     def _build_tab_log(self):
         """Mutual exclusion events scrollable log."""
@@ -1123,6 +1208,13 @@ class ScannerControllerApp(ctk.CTk):
                 if hasattr(self, "card_b"):
                     self.card_b.combo_model.set(new_model.value)
 
+            if scanner_id == "scanner_a" and hasattr(self, "lbl_card_a_title"):
+                self.lbl_card_a_title.configure(text=f"📡 Scanner A ({new_model.value}) — Filename Template & TIT2 Title Tag")
+            elif scanner_id == "scanner_b" and hasattr(self, "lbl_card_b_title"):
+                self.lbl_card_b_title.configure(text=f"📡 Scanner B ({new_model.value}) — Filename Template & TIT2 Title Tag")
+            self._update_filename_preview(scanner_id)
+            self._update_tit2_preview(scanner_id)
+
             self.engine.update_config(self.config)
             save_config(self.config)
             msg = f"[{time.strftime('%H:%M:%S')}] {scanner_id.upper()} model switched to {new_model.value}"
@@ -1202,93 +1294,180 @@ class ScannerControllerApp(ctk.CTk):
             self.entry_inbox.delete(0, "end")
             self.entry_inbox.insert(0, dir_path)
 
-    def _set_filename_preset(self, preset: str):
-        self.entry_filename_template.delete(0, "end")
-        self.entry_filename_template.insert(0, preset)
-        self._update_filename_preview()
+    def _set_filename_preset(self, scanner_id: str, preset: str):
+        if scanner_id == "scanner_a" and hasattr(self, "entry_filename_template_a"):
+            self.entry_filename_template_a.delete(0, "end")
+            self.entry_filename_template_a.insert(0, preset)
+            self._update_filename_preview("scanner_a")
+        elif scanner_id == "scanner_b" and hasattr(self, "entry_filename_template_b"):
+            self.entry_filename_template_b.delete(0, "end")
+            self.entry_filename_template_b.insert(0, preset)
+            self._update_filename_preview("scanner_b")
 
-    def _update_filename_preview(self, event=None):
+    def _update_filename_preview(self, scanner_id: Optional[str] = None, event=None):
         import datetime
         from metadata.proscan_metadata import format_template, sanitize_filename, ProScanMetadata
-        template = self.entry_filename_template.get().strip() or "%DT - %S - %C"
-        sample_meta = ProScanMetadata(
-            scanner="BCD436HP",
-            system_name="Metropolitan P25 Trunk",
-            department_name="Fire & Rescue",
-            channel_name="Dispatch North",
-            frequency="851.2500",
-            tgid="10401",
-            tone="156.7",
-            modulation="NFM",
-            rssi="5"
-        )
-        formatted = format_template(template, sample_meta, datetime.datetime.now())
-        safe_stem = sanitize_filename(formatted)
         ext = self.config.feeder.audio_format.lower()
-        if hasattr(self, "lbl_filename_preview"):
-            self.lbl_filename_preview.configure(text=f"Generated Filename Preview: {safe_stem}.{ext}", text_color="#38BDF8")
+        now = datetime.datetime.now()
 
-    def _set_tit2_preset(self, preset: str):
-        self.entry_tit2_template.delete(0, "end")
-        self.entry_tit2_template.insert(0, preset)
-        self._update_tit2_preview()
+        # Update Scanner A preview
+        if scanner_id in ("scanner_a", None) and hasattr(self, "lbl_filename_preview_a"):
+            tmpl_a = self.entry_filename_template_a.get().strip() if hasattr(self, "entry_filename_template_a") else ""
+            if not tmpl_a:
+                tmpl_a = getattr(self.config.scanner_a, "filename_template", None) or "%DT - %S - %C"
+            model_a = getattr(self.config.scanner_a.model, "value", str(self.config.scanner_a.model))
+            sample_meta_a = ProScanMetadata(
+                scanner=model_a,
+                system_name="Metropolitan P25 Trunk",
+                department_name="Fire & Rescue",
+                channel_name="Dispatch North",
+                frequency="851.2500",
+                tgid="10401",
+                tone="156.7",
+                modulation="NFM",
+                rssi="5"
+            )
+            formatted_a = format_template(tmpl_a, sample_meta_a, now)
+            safe_stem_a = sanitize_filename(formatted_a)
+            self.lbl_filename_preview_a.configure(text=f"Generated Preview: {safe_stem_a}.{ext}", text_color="#38BDF8")
 
-    def _update_tit2_preview(self, event=None):
+        # Update Scanner B preview
+        if scanner_id in ("scanner_b", None) and hasattr(self, "lbl_filename_preview_b"):
+            tmpl_b = self.entry_filename_template_b.get().strip() if hasattr(self, "entry_filename_template_b") else ""
+            if not tmpl_b:
+                tmpl_b = getattr(self.config.scanner_b, "filename_template", None) or "%DT - %S - %C (%TG)"
+            model_b = getattr(self.config.scanner_b.model, "value", str(self.config.scanner_b.model))
+            sample_meta_b = ProScanMetadata(
+                scanner=model_b,
+                system_name="Statewide Highway P25",
+                department_name="Highway Patrol",
+                channel_name="Troop C Main",
+                frequency="773.80625",
+                tgid="20104",
+                tone="",
+                modulation="NFM",
+                rssi="4"
+            )
+            formatted_b = format_template(tmpl_b, sample_meta_b, now)
+            safe_stem_b = sanitize_filename(formatted_b)
+            self.lbl_filename_preview_b.configure(text=f"Generated Preview: {safe_stem_b}.{ext}", text_color="#C084FC")
+
+    def _set_tit2_preset(self, scanner_id: str, preset: str):
+        if scanner_id == "scanner_a" and hasattr(self, "entry_tit2_template_a"):
+            self.entry_tit2_template_a.delete(0, "end")
+            self.entry_tit2_template_a.insert(0, preset)
+            self._update_tit2_preview("scanner_a")
+        elif scanner_id == "scanner_b" and hasattr(self, "entry_tit2_template_b"):
+            self.entry_tit2_template_b.delete(0, "end")
+            self.entry_tit2_template_b.insert(0, preset)
+            self._update_tit2_preview("scanner_b")
+
+    def _update_tit2_preview(self, scanner_id: Optional[str] = None, event=None):
         import datetime
         from metadata.proscan_metadata import format_template, ProScanMetadata
-        template = self.entry_tit2_template.get().strip() if hasattr(self, "entry_tit2_template") else "%C (%TG)"
-        if not template:
-            template = "%C (%TG)"
-        sample_meta = ProScanMetadata(
-            scanner="BCD436HP",
-            system_name="Metropolitan P25 Trunk",
-            department_name="Fire & Rescue",
-            channel_name="Dispatch North",
-            frequency="851.2500",
-            tgid="10401",
-            tone="156.7",
-            modulation="NFM",
-            rssi="5"
-        )
-        formatted = format_template(template, sample_meta, datetime.datetime.now())
-        clean_tit2 = formatted.strip()[:253]
-        if hasattr(self, "lbl_tit2_preview"):
-            self.lbl_tit2_preview.configure(text=f"Generated TIT2 Title Tag: \"{clean_tit2}\"", text_color="#A78BFA")
+        now = datetime.datetime.now()
+
+        # Update Scanner A TIT2 preview
+        if scanner_id in ("scanner_a", None) and hasattr(self, "lbl_tit2_preview_a"):
+            tmpl_a = self.entry_tit2_template_a.get().strip() if hasattr(self, "entry_tit2_template_a") else ""
+            if not tmpl_a:
+                tmpl_a = getattr(self.config.scanner_a, "tit2_template", None) or "%C (%TG)"
+            model_a = getattr(self.config.scanner_a.model, "value", str(self.config.scanner_a.model))
+            sample_meta_a = ProScanMetadata(
+                scanner=model_a,
+                system_name="Metropolitan P25 Trunk",
+                department_name="Fire & Rescue",
+                channel_name="Dispatch North",
+                frequency="851.2500",
+                tgid="10401",
+                tone="156.7",
+                modulation="NFM",
+                rssi="5"
+            )
+            formatted_a = format_template(tmpl_a, sample_meta_a, now).strip()[:253]
+            self.lbl_tit2_preview_a.configure(text=f"Generated TIT2 Title Tag: \"{formatted_a}\"", text_color="#A78BFA")
+
+        # Update Scanner B TIT2 preview
+        if scanner_id in ("scanner_b", None) and hasattr(self, "lbl_tit2_preview_b"):
+            tmpl_b = self.entry_tit2_template_b.get().strip() if hasattr(self, "entry_tit2_template_b") else ""
+            if not tmpl_b:
+                tmpl_b = getattr(self.config.scanner_b, "tit2_template", None) or "%C (%TG)"
+            model_b = getattr(self.config.scanner_b.model, "value", str(self.config.scanner_b.model))
+            sample_meta_b = ProScanMetadata(
+                scanner=model_b,
+                system_name="Statewide Highway P25",
+                department_name="Highway Patrol",
+                channel_name="Troop C Main",
+                frequency="773.80625",
+                tgid="20104",
+                tone="",
+                modulation="NFM",
+                rssi="4"
+            )
+            formatted_b = format_template(tmpl_b, sample_meta_b, now).strip()[:253]
+            self.lbl_tit2_preview_b.configure(text=f"Generated TIT2 Title Tag: \"{formatted_b}\"", text_color="#E9D5FF")
 
     def _save_feeder_config(self):
         self.config.feeder.feeder_mode = FeederMode(self.combo_feeder_mode.get())
         inbox_val = self.entry_inbox.get().strip("\"' \t\r\n")
         self.config.feeder.inbox_directory = inbox_val
-        self.config.feeder.filename_template = self.entry_filename_template.get().strip() or "%DT - %S - %C"
-        if hasattr(self, "entry_tit2_template"):
-            self.config.feeder.tit2_template = self.entry_tit2_template.get().strip() or "%C (%TG)"
+
+        tmpl_a = (self.entry_filename_template_a.get().strip() if hasattr(self, "entry_filename_template_a") else "") or "%DT - %S - %C"
+        tit2_a = (self.entry_tit2_template_a.get().strip() if hasattr(self, "entry_tit2_template_a") else "") or "%C (%TG)"
+        self.config.scanner_a.filename_template = tmpl_a
+        self.config.scanner_a.tit2_template = tit2_a
+
+        tmpl_b = (self.entry_filename_template_b.get().strip() if hasattr(self, "entry_filename_template_b") else "") or "%DT - %S - %C (%TG)"
+        tit2_b = (self.entry_tit2_template_b.get().strip() if hasattr(self, "entry_tit2_template_b") else "") or "%C (%TG)"
+        self.config.scanner_b.filename_template = tmpl_b
+        self.config.scanner_b.tit2_template = tit2_b
+
+        # Global fallbacks on feeder
+        self.config.feeder.filename_template = tmpl_a
+        self.config.feeder.tit2_template = tit2_a
+
         self.config.feeder.webhook_url = self.entry_webhook.get().strip()
         if hasattr(self, "switch_sidecar_json"):
             self.config.feeder.enable_sidecar_json = bool(self.switch_sidecar_json.get())
+
         self.engine.sync_manager.feeder.update_config(self.config.feeder)
+        self.engine.sync_manager.feeder.update_scanner_configs({"scanner_a": self.config.scanner_a, "scanner_b": self.config.scanner_b})
         save_config(self.config)
         resolved_inbox = self.engine.sync_manager.feeder._resolve_inbox_directory()
-        messagebox.showinfo("Feeder Config", f"ScanScribe Feeder settings updated successfully.\nFilename Pattern: {self.config.feeder.filename_template}\nTIT2 Title Tag: {self.config.feeder.tit2_template}\nActive Ingestion Directory:\n{resolved_inbox}")
+        messagebox.showinfo(
+            "Feeder & Scanner Templates Saved",
+            f"ScanScribe Feeder settings updated successfully.\n\n"
+            f"Scanner A ({self.config.scanner_a.model.value}):\n"
+            f"  • Filename: {tmpl_a}\n"
+            f"  • TIT2 Tag: {tit2_a}\n\n"
+            f"Scanner B ({self.config.scanner_b.model.value}):\n"
+            f"  • Filename: {tmpl_b}\n"
+            f"  • TIT2 Tag: {tit2_b}\n\n"
+            f"Active Ingestion Directory:\n{resolved_inbox}"
+        )
 
-    def _dispatch_test_feeder(self):
+    def _dispatch_test_feeder(self, scanner_id: str = "scanner_a"):
+        sc_cfg = self.config.scanner_a if scanner_id == "scanner_a" else self.config.scanner_b
         payload = CallTransmissionPayload(
-            scanner_id="scanner_a",
-            scanner_model=self.config.scanner_a.model.value,
-            system_name="Metropolitan P25 Trunk",
-            department_name="Fire & Rescue",
-            channel_name="Dispatch North",
-            tgid="10401",
-            frequency=851.2500,
+            scanner_id=scanner_id,
+            scanner_model=sc_cfg.model.value,
+            system_name="Metropolitan P25 Trunk" if scanner_id == "scanner_a" else "Statewide Highway P25",
+            department_name="Fire & Rescue" if scanner_id == "scanner_a" else "State Police Dispatch",
+            channel_name="Dispatch North" if scanner_id == "scanner_a" else "Troop C Main",
+            tgid="10401" if scanner_id == "scanner_a" else "20104",
+            frequency=851.2500 if scanner_id == "scanner_a" else 773.80625,
             rssi=5,
             duration_seconds=4.2,
-            timestamp=time.time()
+            timestamp=time.time(),
+            filename_template=getattr(sc_cfg, "filename_template", None),
+            tit2_template=getattr(sc_cfg, "tit2_template", None)
         )
         res = self.engine.sync_manager.feeder.dispatch_call(payload)
         status_val = res.get('status', 'unknown')
-        self.log_text.insert("end", f"[{time.strftime('%H:%M:%S')}] TEST DISPATCH: mode={res.get('mode')} status={status_val}\n")
+        self.log_text.insert("end", f"[{time.strftime('%H:%M:%S')}] TEST DISPATCH [{scanner_id.upper()}]: mode={res.get('mode')} status={status_val}\n")
         self.log_text.see("end")
         file_or_url = res.get('audio_file') or res.get('response') or ''
-        messagebox.showinfo("Test Dispatch", f"Feeder Test Result:\nStatus: {status_val}\nMode: {res.get('mode')}\nFile/URL: {file_or_url}")
+        messagebox.showinfo("Test Dispatch", f"Feeder Test Result for {scanner_id.upper()}:\nStatus: {status_val}\nMode: {res.get('mode')}\nFile/URL: {file_or_url}")
 
     def _clear_log(self):
         self.log_text.delete("1.0", "end")

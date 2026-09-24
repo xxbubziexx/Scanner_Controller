@@ -93,6 +93,8 @@ class ScannerConfig(BaseModel):
     audio_device_index: Optional[int] = None
     audio_channel: AudioChannelMode = AudioChannelMode.MONO
     audio_enabled: bool = True
+    filename_template: Optional[str] = "%DT - %S - %C (%TG)"
+    tit2_template: Optional[str] = "%C (%TG)"
 
 class FeederMode(str, Enum):
     DIRECTORY_DROP = "DIRECTORY_DROP"

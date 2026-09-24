@@ -13,7 +13,9 @@
     "lockout_method": "KEYPRESS",
     "audio_device_index": null,
     "audio_channel": "MONO",
-    "audio_enabled": true
+    "audio_enabled": true,
+    "filename_template": "%TT %D %C",
+    "tit2_template": "%TG %G %C"
   },
   "scanner_b": {
     "id": "scanner_b",
@@ -29,7 +31,9 @@
     "lockout_method": "KEYPRESS",
     "audio_device_index": null,
     "audio_channel": "MONO",
-    "audio_enabled": false
+    "audio_enabled": false,
+    "filename_template": "%DT - %S - %C (%TG)",
+    "tit2_template": "%C (%TG)"
   },
   "sync": {
     "enable_sync": true,
