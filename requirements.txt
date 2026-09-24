@@ -1,0 +1,9 @@
+fastapi>=0.100.0
+uvicorn>=0.22.0
+websockets>=11.0
+pyserial>=3.5
+pydantic>=2.0.0
+sounddevice>=0.4.6
+numpy>=1.20.0
+customtkinter>=6.0.0
+darkdetect>=0.8.0

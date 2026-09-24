@@ -1,0 +1,18 @@
+[Unit]
+Description=Uniden Scanner Controller & ScanScribe Feeder Service
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/scanner_controller
+ExecStart=/opt/scanner_controller/venv/bin/python -m uvicorn server:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=SCANSCRIBE_INBOX_DIR=/var/scanscribe/inbox
+Environment=SCANNER_A_PORT=/dev/ttyACM0
+Environment=SCANNER_B_PORT=NONE
+
+[Install]
+WantedBy=multi-user.target

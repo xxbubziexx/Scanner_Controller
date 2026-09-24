@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Uniden Scanner Mutual Exclusion Controller</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Navbar Header -->
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon">U</div>
+      <div class="logo-text">
+        <h1>Uniden Dynamic Scanner Sync</h1>
+        <p>Mutual Exclusion Controller • ProScan Compatible Auto-Detect Engine</p>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <div class="sync-toggle-box">
+        <span style="font-size: 13px; font-weight: 600;">Mutual Exclusion Sync</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="masterSyncToggle" checked onchange="toggleMasterSync(this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <button class="btn btn-outline" onclick="openAutoDetectModal()">🔍 Auto-Detect Ports</button>
+      <button class="btn btn-outline" onclick="openSettingsModal()">⚙️ Settings</button>
+    </div>
+  </header>
+
+  <div class="container">
+
+    <!-- Scanner A (BCD436HP) -->
+    <div class="scanner-card card-a" id="cardA">
+      <div class="scanner-header">
+        <div class="scanner-title">
+          <h2 id="nameA">Scanner A</h2>
+          <select class="badge-model-select" id="cardModelSelectA" title="Click to change Scanner A model" onchange="changeModelFromCard('scanner_a', this.value)">
+          </select>
+        </div>
+        <div class="status-badge scanning" id="badgeA">
+          <span class="dot-pulse"></span>
+          <span id="statusTextA">SCANNING</span>
+        </div>
+      </div>
+
+      <div class="lcd-display">
+        <div class="lcd-sys" id="sysA">METRO P25 TRUNKING</div>
+        <div class="lcd-dept" id="deptA">POLICE DISPATCH NORTH</div>
+        <div class="lcd-channel" id="chanA">SCANNING...</div>
+        <div class="lcd-meta-row">
+          <div class="meta-item"><span>TGID:</span> <strong id="tgidA">--</strong></div>
+          <div class="meta-item"><span>FREQ:</span> <strong id="freqA">-- MHz</strong></div>
+          <div class="meta-item"><span>MOD:</span> <strong id="modA">NFM</strong></div>
+          <div class="rssi-container" id="rssiA">
+            <div class="rssi-bar b1"></div>
+            <div class="rssi-bar b2"></div>
+            <div class="rssi-bar b3"></div>
+            <div class="rssi-bar b4"></div>
+            <div class="rssi-bar b5"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scanner-actions">
+        <button class="btn btn-danger" style="width: 100%;" onclick="sendSkip('scanner_a')">⏭️ SKIP / AVOID (KEY,AVD)</button>
+      </div>
+    </div>
+
+    <!-- Scanner B (BCD996P2) -->
+    <div class="scanner-card card-b" id="cardB">
+      <div class="scanner-header">
+        <div class="scanner-title">
+          <h2 id="nameB">Scanner B</h2>
+          <select class="badge-model-select" id="cardModelSelectB" title="Click to change Scanner B model" onchange="changeModelFromCard('scanner_b', this.value)">
+          </select>
+        </div>
+        <div class="status-badge scanning" id="badgeB">
+          <span class="dot-pulse"></span>
+          <span id="statusTextB">SCANNING</span>
+        </div>
+      </div>
+
+      <div class="lcd-display">
+        <div class="lcd-sys" id="sysB">COUNTY SIMULCAST</div>
+        <div class="lcd-dept" id="deptB">SHERIFF PRIMARY</div>
+        <div class="lcd-channel" id="chanB">SCANNING...</div>
+        <div class="lcd-meta-row">
+          <div class="meta-item"><span>TGID:</span> <strong id="tgidB">--</strong></div>
+          <div class="meta-item"><span>FREQ:</span> <strong id="freqB">-- MHz</strong></div>
+          <div class="meta-item"><span>MOD:</span> <strong id="modB">P25</strong></div>
+          <div class="rssi-container" id="rssiB">
+            <div class="rssi-bar b1"></div>
+            <div class="rssi-bar b2"></div>
+            <div class="rssi-bar b3"></div>
+            <div class="rssi-bar b4"></div>
+            <div class="rssi-bar b5"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scanner-actions">
+        <button class="btn btn-danger" style="width: 100%;" onclick="sendSkip('scanner_b')">⏭️ SKIP / LOCKOUT (KEY,L/O)</button>
+      </div>
+    </div>
+
+    <!-- Mutual Exclusion Configuration Hub -->
+    <div class="panel full-width">
+      <div class="panel-header">
+        <h2>⚡ Mutual Exclusion Engine Controls</h2>
+        <span style="font-size: 13px; color: var(--emerald-recv); font-weight: 600;" id="engineModeStatus">● Engine Active (Hardware Serial Mode)</span>
+      </div>
+
+      <div class="rule-grid">
+        <div class="form-group">
+          <label for="exclusionModeSelect">Exclusion Matching Rule</label>
+          <select id="exclusionModeSelect" class="form-select" onchange="updateEngineRules()">
+            <option value="TGID_AND_FREQ">Match TGID OR Frequency</option>
+            <option value="TGID_ONLY">Match TGID Only</option>
+            <option value="FREQ_ONLY">Match Frequency Only</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="priorityModeSelect">Priority Conflict Policy</label>
+          <select id="priorityModeSelect" class="form-select" onchange="updateEngineRules()">
+            <option value="EQUAL_PEERS">Equal Peers (First-Come First-Served)</option>
+            <option value="PRIMARY_SECONDARY">Primary / Secondary Pre-emption</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="primaryScannerSelect">Primary Priority Scanner</label>
+          <select id="primaryScannerSelect" class="form-select" onchange="updateEngineRules()">
+            <option value="scanner_a">Scanner A</option>
+            <option value="scanner_b">Scanner B</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Mutual Exclusion Event Feed -->
+    <div class="panel full-width">
+      <div class="panel-header">
+        <h2>📜 Real-Time Mutual Exclusion Activity Log</h2>
+        <span style="font-size: 12px; color: var(--text-dim);" id="logCount">0 events recorded</span>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>TIME</th>
+              <th>TRIGGER</th>
+              <th>TARGET SCANNER</th>
+              <th>EXCLUDED TGID/FREQ</th>
+              <th>CHANNEL NAME</th>
+              <th>REASON</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 20px;">No mutual exclusion events recorded yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Auto-Detect Modal -->
+  <div class="modal-overlay" id="autoDetectModal">
+    <div class="modal-card" style="width: 800px; max-width: 95vw;">
+      <div class="modal-header">
+        <h2>🔍 ProScan Serial Port & Scanner Auto-Detect</h2>
+        <button class="close-btn" onclick="closeAutoDetectModal()">&times;</button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+        Probes COM ports at 115200..2400 baud sending <code style="color: var(--cyan-accent);">\rMDL\r</code> and <code style="color: var(--cyan-accent);">\rSI\r</code> wire queries.
+      </p>
+
+      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+        <button class="btn btn-primary" id="btnRunAutoDetect" onclick="runAutoDetect()">🔄 Run Serial Auto-Detect</button>
+        <button class="btn btn-outline" onclick="runLANDiscovery()">🌐 Discover LAN UDP Scanners</button>
+      </div>
+
+      <div style="overflow-x: auto; max-height: 350px; overflow-y: auto;">
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>PORT</th>
+              <th>STATUS</th>
+              <th>DETECTED SCANNER MODEL</th>
+              <th>BAUD RATE</th>
+              <th>ACTION</th>
+            </tr>
+          </thead>
+          <tbody id="autoDetectTableBody">
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 20px;">Click "Run Serial Auto-Detect" to scan connected hardware ports.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+        <button class="btn btn-outline" onclick="closeAutoDetectModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>⚙️ System & Driver Configuration</h2>
+        <button class="close-btn" onclick="closeSettingsModal()">&times;</button>
+      </div>
+
+      <form id="configForm" onsubmit="saveConfiguration(event)">
+        <h3 style="font-size: 14px; margin-bottom: 12px; color: var(--cyan-accent);">Scanner A Settings</h3>
+        <div class="rule-grid">
+          <div class="form-group">
+            <label>Radio Model (34 Catalog)</label>
+            <select id="cfg_model_a" class="form-select" onchange="updateBaudOptions('a')"></select>
+          </div>
+          <div class="form-group">
+            <label>Connection Mode</label>
+            <select id="cfg_mode_a" class="form-select" onchange="toggleConnectionModeUI('a')">
+              <option value="SERIAL">Serial COM Port</option>
+              <option value="IP">IP Sockets / ser2net</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label id="lbl_port_a">Available COM Port</label>
+              <button type="button" onclick="refreshComPorts()" style="background: none; border: none; color: var(--cyan-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Ports</button>
+            </div>
+            <select id="cfg_port_a" class="form-select"></select>
+            <input type="text" id="cfg_custom_port_a" class="form-input" style="display: none; margin-top: 6px;" placeholder="e.g. 192.168.1.50 or COM5">
+          </div>
+          <div class="form-group">
+            <label>Baud Rate</label>
+            <select id="cfg_baud_a" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label>Audio Input Device</label>
+            <select id="cfg_audio_dev_a" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label>Audio Channel</label>
+            <select id="cfg_audio_ch_a" class="form-select">
+              <option value="MONO">Mono / All Channels</option>
+              <option value="LEFT">Left Channel (Stereo Splitter)</option>
+              <option value="RIGHT">Right Channel (Stereo Splitter)</option>
+            </select>
+          </div>
+        </div>
+
+        <h3 style="font-size: 14px; margin-top: 16px; margin-bottom: 12px; color: var(--violet-accent);">Scanner B Settings</h3>
+        <div class="rule-grid">
+          <div class="form-group">
+            <label>Radio Model (34 Catalog)</label>
+            <select id="cfg_model_b" class="form-select" onchange="updateBaudOptions('b')"></select>
+          </div>
+          <div class="form-group">
+            <label>Connection Mode</label>
+            <select id="cfg_mode_b" class="form-select" onchange="toggleConnectionModeUI('b')">
+              <option value="SERIAL">Serial COM Port</option>
+              <option value="IP">IP Sockets / ser2net</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label id="lbl_port_b">Available COM Port</label>
+              <button type="button" onclick="refreshComPorts()" style="background: none; border: none; color: var(--violet-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Ports</button>
+            </div>
+            <select id="cfg_port_b" class="form-select"></select>
+            <input type="text" id="cfg_custom_port_b" class="form-input" style="display: none; margin-top: 6px;" placeholder="e.g. 192.168.1.50 or COM5">
+          </div>
+          <div class="form-group">
+            <label>Baud Rate</label>
+            <select id="cfg_baud_b" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label>Audio Input Device</label>
+            <select id="cfg_audio_dev_b" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label>Audio Channel</label>
+            <select id="cfg_audio_ch_b" class="form-select">
+              <option value="MONO">Mono / All Channels</option>
+              <option value="LEFT">Left Channel (Stereo Splitter)</option>
+              <option value="RIGHT">Right Channel (Stereo Splitter)</option>
+            </select>
+          </div>
+        </div>
+
+        <h3 style="font-size: 14px; margin-top: 16px; margin-bottom: 12px; color: var(--emerald-recv);">📡 ScanScribe Pipeline Feeder Settings</h3>
+        <div class="rule-grid">
+          <div class="form-group">
+            <label>Feeder Ingest Mode</label>
+            <select id="cfg_feeder_mode" class="form-select">
+              <option value="DIRECTORY_DROP">ScanScribe Inbox Directory Drop</option>
+              <option value="HTTP_WEBHOOK">ScanScribe HTTP Webhook POST</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Audio File Format</label>
+            <select id="cfg_feeder_format" class="form-select">
+              <option value="WAV" selected>WAV Audio (RIFF LIST Tagged - Recommended)</option>
+              <option value="MP3">MP3 Audio (ID3v2.3 Tagged)</option>
+            </select>
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>ScanScribe Inbox Watch Directory Path</label>
+            <input type="text" id="cfg_feeder_inbox" class="form-input" value="A:\Scanscribe_Projects\scanscribe\inbox">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px;">
+          <button type="button" class="btn btn-outline" style="color: var(--cyan-accent);" onclick="testScanScribeFeeder()">📡 Send Test Feed to ScanScribe</button>
+          <div style="display: flex; gap: 12px;">
+            <button type="button" class="btn btn-outline" onclick="closeSettingsModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save & Apply</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

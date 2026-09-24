@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  scanner-controller:
+    build: .
+    container_name: uniden-scanner-controller
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SCANSCRIBE_INBOX_DIR=/data/inbox
+      - SCANNER_A_PORT=/dev/ttyACM0
+      - SCANNER_B_PORT=NONE
+    # Pass through physical USB serial scanners to the container
+    devices:
+      - "/dev/ttyACM0:/dev/ttyACM0"
+      # - "/dev/ttyUSB0:/dev/ttyUSB0"
+    volumes:
+      # Mount host directory for direct ScanScribe inbox file drop
+      - ./inbox:/data/inbox

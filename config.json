@@ -1,0 +1,61 @@
+{
+  "scanner_a": {
+    "id": "scanner_a",
+    "name": "Scanner A",
+    "model": "BCD996P2",
+    "connection_mode": "SERIAL",
+    "port": "COM5",
+    "baud_rate": 115200,
+    "ip_host": "127.0.0.1",
+    "ip_port": 5000,
+    "enabled": true,
+    "poll_interval_ms": 150,
+    "lockout_method": "KEYPRESS",
+    "audio_device_index": null,
+    "audio_channel": "MONO",
+    "audio_enabled": true
+  },
+  "scanner_b": {
+    "id": "scanner_b",
+    "name": "Scanner B",
+    "model": "BCD996P2",
+    "connection_mode": "SERIAL",
+    "port": "NONE",
+    "baud_rate": 115200,
+    "ip_host": "127.0.0.1",
+    "ip_port": 5000,
+    "enabled": false,
+    "poll_interval_ms": 150,
+    "lockout_method": "KEYPRESS",
+    "audio_device_index": null,
+    "audio_channel": "MONO",
+    "audio_enabled": false
+  },
+  "sync": {
+    "enable_sync": true,
+    "exclusion_mode": "TGID_AND_FREQ",
+    "priority_mode": "EQUAL_PEERS",
+    "primary_scanner_id": "scanner_a",
+    "hang_time_seconds": 2.0,
+    "auto_release_seconds": 30.0
+  },
+  "feeder": {
+    "enable_feeder": true,
+    "feeder_mode": "DIRECTORY_DROP",
+    "inbox_directory": "A:\\Scanscribe_Projects\\scanscribe\\inbox",
+    "filename_template": "%TT %D %C",
+    "tit2_template": "%TG %G %C",
+    "webhook_url": "http://127.0.0.1:5000/api/ingest",
+    "audio_format": "MP3",
+    "audio_device_index": null,
+    "sample_rate": 16000,
+    "enable_sidecar_json": true,
+    "enable_proscan_tags": true
+  },
+  "audio_loopback": {
+    "enabled": true,
+    "output_device_index": null,
+    "volume": 0.8,
+    "pan_mode": "STEREO_SPLIT"
+  }
+}
