@@ -9,7 +9,8 @@ import time
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from config import ScanScribeFeederConfig, FeederMode
-from feeder.scanscribe_feeder import ScanScribeFeeder, CallTransmissionPayload
+from feeder.scanscribe_feeder import ScanScribeFeeder, CallTransmissionPayload, is_valid_mp3_payload
+from metadata.proscan_metadata import ProScanMetadata, write_mp3_id3v23
 
 class TestScanScribeFeeder(unittest.TestCase):
 
@@ -225,6 +226,77 @@ class TestScanScribeFeeder(unittest.TestCase):
         with open(res["audio_file"], "rb") as f:
             audio_bytes = f.read()
         self.assertIn(b"OVERRIDE_TITLE_Custom Chan", audio_bytes)
+
+    def test_is_valid_mp3_payload_rejects_pcm_and_accepts_mp3(self):
+        """Verifies raw PCM starting with 0xFFFF (sample -1) is NOT falsely flagged as MP3."""
+        # 16-bit signed PCM starting with -1 (0xFFFF)
+        negative_pcm = b"\xff\xff\x00\x00" * 2000
+        self.assertFalse(is_valid_mp3_payload(negative_pcm))
+
+        # Silence PCM
+        silence_pcm = b"\x00\x00" * 2000
+        self.assertFalse(is_valid_mp3_payload(silence_pcm))
+
+        # Real encoded MP3
+        import lameenc
+        encoder = lameenc.Encoder()
+        encoder.set_bit_rate(64)
+        encoder.set_in_sample_rate(16000)
+        encoder.set_channels(1)
+        real_mp3 = encoder.encode(negative_pcm) + encoder.flush()
+        self.assertTrue(is_valid_mp3_payload(real_mp3))
+
+    def test_mp3_generation_with_negative_pcm_samples(self):
+        """Verifies feeder properly encodes negative PCM samples to valid MP3 that Mutagen can parse."""
+        self.config.audio_format = "MP3"
+        self.config.sample_rate = 16000
+        negative_pcm = b"\xff\xff\x00\x00\x01\x00\x04\x00" * 4000  # 16000 samples = 1 sec
+        payload = CallTransmissionPayload(
+            scanner_id="scanner_a",
+            scanner_model="BCD996P2",
+            system_name="St. Francois",
+            department_name="Central Dispatch",
+            channel_name="EMS 1",
+            tgid="101",
+            frequency=155.1975,
+            duration_seconds=1.0,
+            audio_pcm=negative_pcm
+        )
+        res = self.feeder.dispatch_call(payload)
+        self.assertEqual(res["status"], "success")
+        self.assertTrue(res["audio_file"].endswith(".mp3"))
+
+        # Verify with Mutagen that there is NO "can't sync to MPEG frame" exception!
+        import mutagen.mp3
+        mp3_obj = mutagen.mp3.MP3(res["audio_file"])
+        self.assertIsNotNone(mp3_obj.info)
+        self.assertGreater(mp3_obj.info.length, 0.5)
+        self.assertEqual(mp3_obj.info.sample_rate, 16000)
+        self.assertIn("TIT2", mp3_obj.tags)
+
+    def test_write_mp3_id3v23_strips_existing_tag(self):
+        """Verifies write_mp3_id3v23 does not double-wrap or corrupt already-tagged MP3 files."""
+        meta1 = ProScanMetadata(channel_name="Original Tag")
+        import lameenc
+        encoder = lameenc.Encoder()
+        encoder.set_bit_rate(64)
+        encoder.set_in_sample_rate(16000)
+        encoder.set_channels(1)
+        mp3_raw = encoder.encode(b"\x00\x00" * 8000) + encoder.flush()
+
+        tagged_once = write_mp3_id3v23(mp3_raw, meta1, title_template="%C")
+        meta2 = ProScanMetadata(channel_name="Replacement Tag")
+        tagged_twice = write_mp3_id3v23(tagged_once, meta2, title_template="%C")
+
+        # Verify only a single ID3 header exists at byte 0
+        self.assertTrue(tagged_twice.startswith(b"ID3"))
+        second_id3_idx = tagged_twice[3:].find(b"ID3")
+        self.assertEqual(second_id3_idx, -1)
+
+        import io
+        import mutagen.mp3
+        m = mutagen.mp3.MP3(io.BytesIO(tagged_twice))
+        self.assertEqual(str(m.tags["TIT2"]), "Replacement Tag")
 
 if __name__ == "__main__":
     unittest.main()

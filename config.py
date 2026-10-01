@@ -2,11 +2,14 @@ import os
 import sys
 import json
 import logging
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 from typing import Optional, List
 
 logger = logging.getLogger("ConfigManager")
+
+# ProScan standard supported samples per second rates (NONE ELSE)
+ALLOWED_SAMPLE_RATES: List[int] = [8000, 11025, 16000, 22050, 44100]
 
 class ConnectionMode(str, Enum):
     SERIAL = "SERIAL"
@@ -132,6 +135,24 @@ class ScanScribeFeederConfig(BaseModel):
     sample_rate: int = 16000
     enable_sidecar_json: bool = True
     enable_proscan_tags: bool = True
+
+    @field_validator("sample_rate")
+    @classmethod
+    def validate_sample_rate(cls, v: int) -> int:
+        val = int(v)
+        if val not in ALLOWED_SAMPLE_RATES:
+            raise ValueError(
+                f"Unsupported sample rate: {v}. Must be one of {ALLOWED_SAMPLE_RATES} (NONE ELSE)."
+            )
+        return val
+
+    @field_validator("audio_format")
+    @classmethod
+    def validate_audio_format(cls, v: str) -> str:
+        fmt = v.upper().strip()
+        if fmt not in ("WAV", "MP3"):
+            raise ValueError(f"Unsupported audio format: {v}. Must be WAV or MP3.")
+        return fmt
 
 class SyncConfig(BaseModel):
     enable_sync: bool = True

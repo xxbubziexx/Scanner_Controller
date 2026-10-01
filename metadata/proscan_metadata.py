@@ -477,8 +477,17 @@ def write_mp3_id3v23(
     tag_payload = b"".join(frames)
     tag_size_syncsafe = _encode_syncsafe(len(tag_payload))
 
+    # Strip existing ID3v2 header from audio_bytes to avoid duplicate/corrupted tags
+    clean_audio = audio_bytes
+    if clean_audio.startswith(b"ID3") and len(clean_audio) >= 10:
+        existing_len = (clean_audio[6] << 21) | (clean_audio[7] << 14) | (clean_audio[8] << 7) | clean_audio[9]
+        strip_offset = 10 + existing_len
+        if clean_audio[5] & 0x10:  # Footer present
+            strip_offset += 10
+        clean_audio = clean_audio[strip_offset:]
+
     id3_header = b"ID3\x03\x00\x00" + tag_size_syncsafe
-    return id3_header + tag_payload + audio_bytes
+    return id3_header + tag_payload + clean_audio
 
 
 def _build_riff_info_subchunk(chunk_id: str, text: str) -> bytes:
@@ -513,6 +522,11 @@ def write_wav_riff_info(
     """
     if not now:
         now = datetime.datetime.now()
+
+    if sample_rate not in (8000, 11025, 16000, 22050, 44100):
+        raise ValueError(
+            f"Unsupported sample rate: {sample_rate}. ProScan format strictly requires one of (8000, 11025, 16000, 22050, 44100), NONE ELSE."
+        )
 
     icrd_str = f"{now.strftime('%Y%m%d%H%M%S')}-00000000000000"
 

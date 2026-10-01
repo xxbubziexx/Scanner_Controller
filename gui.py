@@ -13,7 +13,7 @@ from tkinter import filedialog, messagebox
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-from config import AppConfig, load_config, save_config, PriorityMode, ExclusionMode, FeederMode, ScannerModel, get_allowed_baud_rates, AudioChannelMode
+from config import AppConfig, load_config, save_config, PriorityMode, ExclusionMode, FeederMode, ScannerModel, get_allowed_baud_rates, AudioChannelMode, ALLOWED_SAMPLE_RATES
 from engine.sync_manager import SyncManager
 from discovery.serial_detector import detect_serial_ports
 from discovery.net_detector import discover_lan_scanners
@@ -726,6 +726,31 @@ class ScannerControllerApp(ctk.CTk):
             self.switch_loopback_enable.deselect()
         self.switch_loopback_enable.grid(row=7, column=2, columnspan=2, padx=12, pady=(4, 14), sticky="w")
 
+        # Row 8: Recording Samples Per Second & Format
+        ctk.CTkLabel(grid, text="Samples Per Second:", font=ctk.CTkFont(weight="bold"), text_color="#38BDF8").grid(row=8, column=0, padx=12, pady=(4, 14), sticky="w")
+        self.combo_sample_rate_hw = ctk.CTkComboBox(
+            grid,
+            values=[str(r) for r in ALLOWED_SAMPLE_RATES],
+            width=120,
+            state="readonly",
+            command=self._on_sample_rate_hw_changed
+        )
+        current_sr = str(self.config.feeder.sample_rate or 16000)
+        self.combo_sample_rate_hw.set(current_sr if current_sr in [str(r) for r in ALLOWED_SAMPLE_RATES] else "16000")
+        self.combo_sample_rate_hw.grid(row=8, column=1, padx=12, pady=(4, 14), sticky="ew")
+
+        ctk.CTkLabel(grid, text="Recording Format:", font=ctk.CTkFont(weight="bold"), text_color="#E2E8F0").grid(row=8, column=2, padx=12, pady=(4, 14), sticky="w")
+        self.combo_audio_format_hw = ctk.CTkComboBox(
+            grid,
+            values=["WAV", "MP3"],
+            width=120,
+            state="readonly",
+            command=self._on_audio_format_hw_changed
+        )
+        current_fmt = (self.config.feeder.audio_format or "WAV").upper()
+        self.combo_audio_format_hw.set(current_fmt if current_fmt in ["WAV", "MP3"] else "WAV")
+        self.combo_audio_format_hw.grid(row=8, column=3, padx=12, pady=(4, 14), sticky="ew")
+
         # Save Button
         btn_save = ctk.CTkButton(
             frame,
@@ -763,11 +788,32 @@ class ScannerControllerApp(ctk.CTk):
 
         # Mode row
         row_mode = ctk.CTkFrame(frame, fg_color="transparent")
-        row_mode.pack(fill="x", padx=16, pady=(10, 6))
+        row_mode.pack(fill="x", padx=16, pady=(10, 4))
         ctk.CTkLabel(row_mode, text="Feeder Ingestion Mode:", font=ctk.CTkFont(weight="bold"), width=160, anchor="w").pack(side="left")
-        self.combo_feeder_mode = ctk.CTkComboBox(row_mode, values=["DIRECTORY_DROP", "HTTP_WEBHOOK", "LIVE_STREAM"], width=200)
+        self.combo_feeder_mode = ctk.CTkComboBox(row_mode, values=["DIRECTORY_DROP", "HTTP_WEBHOOK", "LIVE_STREAM"], width=200, state="readonly")
         self.combo_feeder_mode.set(self.config.feeder.feeder_mode.value)
         self.combo_feeder_mode.pack(side="left")
+
+        # Audio Format & Samples Per Second row
+        row_audio_fmt = ctk.CTkFrame(frame, fg_color="transparent")
+        row_audio_fmt.pack(fill="x", padx=16, pady=(4, 6))
+
+        ctk.CTkLabel(row_audio_fmt, text="Audio Format:", font=ctk.CTkFont(weight="bold"), width=160, anchor="w").pack(side="left")
+        self.combo_audio_format = ctk.CTkComboBox(row_audio_fmt, values=["WAV", "MP3"], width=100, state="readonly", command=self._on_audio_format_changed)
+        current_fmt = (self.config.feeder.audio_format or "WAV").upper()
+        self.combo_audio_format.set(current_fmt if current_fmt in ["WAV", "MP3"] else "WAV")
+        self.combo_audio_format.pack(side="left", padx=(0, 24))
+
+        ctk.CTkLabel(row_audio_fmt, text="Samples Per Second:", font=ctk.CTkFont(weight="bold"), text_color="#38BDF8", width=150, anchor="w").pack(side="left")
+        self.combo_sample_rate = ctk.CTkComboBox(
+            row_audio_fmt,
+            values=[str(r) for r in ALLOWED_SAMPLE_RATES],
+            width=120,
+            state="readonly"
+        )
+        current_sr = str(self.config.feeder.sample_rate or 16000)
+        self.combo_sample_rate.set(current_sr if current_sr in [str(r) for r in ALLOWED_SAMPLE_RATES] else "16000")
+        self.combo_sample_rate.pack(side="left")
 
         # JSON Sidecar switch row
         row_json = ctk.CTkFrame(frame, fg_color="transparent")
@@ -782,8 +828,6 @@ class ScannerControllerApp(ctk.CTk):
             self.switch_sidecar_json.select()
         else:
             self.switch_sidecar_json.deselect()
-        self.switch_sidecar_json.pack(side="left")
-
         self.switch_sidecar_json.pack(side="left")
 
         # --- Scanner A Filename & TIT2 Patterns Card ---
@@ -1276,6 +1320,19 @@ class ScannerControllerApp(ctk.CTk):
         self.config.audio_loopback.volume = float(self.slider_volume.get()) / 100.0
         self.config.audio_loopback.pan_mode = "STEREO_SPLIT" if "STEREO" in self.combo_pan_mode.get() else "CENTER"
 
+        if hasattr(self, "combo_sample_rate_hw"):
+            sr_hw = int(self.combo_sample_rate_hw.get())
+            if sr_hw in ALLOWED_SAMPLE_RATES:
+                self.config.feeder.sample_rate = sr_hw
+                if hasattr(self, "combo_sample_rate"):
+                    self.combo_sample_rate.set(str(sr_hw))
+
+        if hasattr(self, "combo_audio_format_hw"):
+            fmt_hw = self.combo_audio_format_hw.get().upper()
+            self.config.feeder.audio_format = fmt_hw
+            if hasattr(self, "combo_audio_format"):
+                self.combo_audio_format.set(fmt_hw)
+
         self.engine.update_config(self.config)
         save_config(self.config)
 
@@ -1285,7 +1342,8 @@ class ScannerControllerApp(ctk.CTk):
             f"Configuration Applied:\n"
             f"• Scanner A: {self.config.scanner_a.model.value} on {self.config.scanner_a.port} | Audio: {sel_audio_a} ({ch_a})\n"
             f"• Scanner B: {self.config.scanner_b.model.value} on {self.config.scanner_b.port} | Audio: {sel_audio_b} ({ch_b})\n"
-            f"• Playback Output: {out_name} (Vol: {int(self.config.audio_loopback.volume * 100)}%, {self.config.audio_loopback.pan_mode})"
+            f"• Playback Output: {out_name} (Vol: {int(self.config.audio_loopback.volume * 100)}%, {self.config.audio_loopback.pan_mode})\n"
+            f"• Recording: {self.config.feeder.audio_format} @ {self.config.feeder.sample_rate} Samples/Sec"
         )
 
     def _browse_inbox_dir(self):
@@ -1407,10 +1465,41 @@ class ScannerControllerApp(ctk.CTk):
             formatted_b = format_template(tmpl_b, sample_meta_b, now).strip()[:253]
             self.lbl_tit2_preview_b.configure(text=f"Generated TIT2 Title Tag: \"{formatted_b}\"", text_color="#E9D5FF")
 
+    def _on_sample_rate_hw_changed(self, choice: str):
+        if hasattr(self, "combo_sample_rate"):
+            self.combo_sample_rate.set(choice)
+
+    def _on_audio_format_hw_changed(self, choice: str):
+        if hasattr(self, "combo_audio_format"):
+            self.combo_audio_format.set(choice)
+        self._on_audio_format_changed(choice)
+
+    def _on_audio_format_changed(self, choice: str):
+        self.config.feeder.audio_format = choice.upper()
+        if hasattr(self, "combo_audio_format_hw"):
+            self.combo_audio_format_hw.set(choice.upper())
+        self._update_filename_preview("scanner_a")
+        self._update_filename_preview("scanner_b")
+
     def _save_feeder_config(self):
         self.config.feeder.feeder_mode = FeederMode(self.combo_feeder_mode.get())
         inbox_val = self.entry_inbox.get().strip("\"' \t\r\n")
         self.config.feeder.inbox_directory = inbox_val
+
+        if hasattr(self, "combo_audio_format"):
+            fmt_val = self.combo_audio_format.get().upper()
+            self.config.feeder.audio_format = fmt_val
+            if hasattr(self, "combo_audio_format_hw"):
+                self.combo_audio_format_hw.set(fmt_val)
+
+        if hasattr(self, "combo_sample_rate"):
+            sr_val = int(self.combo_sample_rate.get())
+            if sr_val not in ALLOWED_SAMPLE_RATES:
+                messagebox.showerror("Invalid Sample Rate", f"Sample rate must be one of {ALLOWED_SAMPLE_RATES} (NONE ELSE).")
+                return
+            self.config.feeder.sample_rate = sr_val
+            if hasattr(self, "combo_sample_rate_hw"):
+                self.combo_sample_rate_hw.set(str(sr_val))
 
         tmpl_a = (self.entry_filename_template_a.get().strip() if hasattr(self, "entry_filename_template_a") else "") or "%DT - %S - %C"
         tit2_a = (self.entry_tit2_template_a.get().strip() if hasattr(self, "entry_tit2_template_a") else "") or "%C (%TG)"
@@ -1437,6 +1526,9 @@ class ScannerControllerApp(ctk.CTk):
         messagebox.showinfo(
             "Feeder & Scanner Templates Saved",
             f"ScanScribe Feeder settings updated successfully.\n\n"
+            f"Audio Recording Format:\n"
+            f"  • Format: {self.config.feeder.audio_format}\n"
+            f"  • Samples Per Second: {self.config.feeder.sample_rate} Hz\n\n"
             f"Scanner A ({self.config.scanner_a.model.value}):\n"
             f"  • Filename: {tmpl_a}\n"
             f"  • TIT2 Tag: {tit2_a}\n\n"

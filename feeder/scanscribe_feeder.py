@@ -39,6 +39,75 @@ class CallTransmissionPayload(BaseModel):
     filename_template: Optional[str] = None
     tit2_template: Optional[str] = None
 
+def is_valid_mp3_payload(data: Optional[bytes]) -> bool:
+    """
+    Robust check to verify if a byte sequence contains genuine MP3 audio frames,
+    preventing raw 16-bit PCM audio (which frequently begins with negative samples
+    like 0xFFFF) from being misidentified as MP3 and causing downstream Mutagen /
+    MPEG sync decoder errors ("can't sync to MPEG frame").
+    """
+    if not data or len(data) < 64:
+        return False
+    if data.startswith(b"RIFF"):
+        return False
+
+    # 1. Try mutagen if installed
+    try:
+        import io
+        import mutagen.mp3
+        m = mutagen.mp3.MP3(io.BytesIO(data))
+        if m.info is not None and getattr(m.info, "length", 0) > 0:
+            return True
+    except Exception:
+        pass
+
+    # 2. Pure-Python consecutive MPEG Layer III frame sync validation
+    start_idx = 0
+    if data.startswith(b"ID3") and len(data) >= 10:
+        tag_len = (data[6] << 21) | (data[7] << 14) | (data[8] << 7) | data[9]
+        start_idx = 10 + tag_len
+        if data[5] & 0x10:  # ID3v2.4 footer present
+            start_idx += 10
+
+    bitrate_map_v1_l3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0]
+    bitrate_map_v2_l3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0]
+    sample_rate_map = {
+        3: [44100, 48000, 32000],  # MPEG-1
+        2: [22050, 24000, 16000],  # MPEG-2
+        0: [11025, 12000, 8000],   # MPEG-2.5
+    }
+
+    n = len(data)
+    i = start_idx
+    limit = min(n - 4, start_idx + 1024)
+    while i < limit:
+        b0 = data[i]
+        b1 = data[i + 1]
+        if b0 == 0xFF and (b1 & 0xE0) == 0xE0:
+            version_idx = (b1 >> 3) & 0x03
+            layer_idx = (b1 >> 1) & 0x03
+            if version_idx in sample_rate_map and layer_idx == 1:  # Layer III (MP3)
+                b2 = data[i + 2]
+                br_idx = (b2 >> 4) & 0x0F
+                sr_idx = (b2 >> 2) & 0x03
+                padding = (b2 >> 1) & 0x01
+                if 0 < br_idx < 15 and sr_idx < 3:
+                    sr = sample_rate_map[version_idx][sr_idx]
+                    br = (bitrate_map_v1_l3[br_idx] if version_idx == 3 else bitrate_map_v2_l3[br_idx]) * 1000
+                    frame_len = (144 * br // sr + padding) if version_idx == 3 else (72 * br // sr + padding)
+                    next_i = i + frame_len
+                    if next_i + 2 <= n:
+                        nb0 = data[next_i]
+                        nb1 = data[next_i + 1]
+                        if nb0 == 0xFF and (nb1 & 0xE0) == 0xE0:
+                            n_ver = (nb1 >> 3) & 0x03
+                            n_layer = (nb1 >> 1) & 0x03
+                            if n_ver == version_idx and n_layer == layer_idx:
+                                return True
+        i += 1
+    return False
+
+
 class ScanScribeFeeder:
     """
     Feeder module that packages completed radio transmissions with ProScan metadata
@@ -118,12 +187,18 @@ class ScanScribeFeeder:
 
     def _generate_audio_bytes(self, payload: CallTransmissionPayload, meta: ProScanMetadata, tit2_template: Optional[str] = None) -> Tuple[bytes, str]:
         """Generate ProScan-tagged audio bytes (MP3 or WAV) and return (bytes, file_extension)"""
-        pcm = payload.audio_pcm if payload.audio_pcm else (b"\x00\x00" * 8000 * 3)
         requested_ext = self.config.audio_format.lower()
         sample_rate = self.config.sample_rate or 16000
+        if sample_rate not in (8000, 11025, 16000, 22050, 44100):
+            raise ValueError(
+                f"Unsupported sample rate: {sample_rate}. Strictly must be one of [8000, 11025, 16000, 22050, 44100] (NONE ELSE)."
+            )
 
-        # Check if payload is already encoded MP3
-        is_mp3_payload = pcm.startswith(b"ID3") or (len(pcm) > 2 and pcm[0] == 0xFF and (pcm[1] & 0xE0) == 0xE0)
+        pcm = payload.audio_pcm if payload.audio_pcm else (b"\x00\x00" * sample_rate * 3)
+
+        # Check if payload is genuinely already encoded MP3
+        is_mp3_payload = is_valid_mp3_payload(pcm)
+
 
         if not tit2_template:
             _, tit2_template = self.get_scanner_templates(payload)
@@ -136,7 +211,12 @@ class ScanScribeFeeder:
                 try:
                     import lameenc
                     encoder = lameenc.Encoder()
-                    encoder.set_bit_rate(128)
+                    if sample_rate in (8000, 11025):
+                        encoder.set_bit_rate(32)
+                    elif sample_rate in (16000, 22050):
+                        encoder.set_bit_rate(64)
+                    else:
+                        encoder.set_bit_rate(128)
                     encoder.set_in_sample_rate(sample_rate)
                     encoder.set_channels(1)
                     encoder.set_quality(2)

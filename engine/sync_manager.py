@@ -3,7 +3,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, List, Optional, Callable
-from config import AppConfig, PriorityMode, ExclusionMode
+from config import AppConfig, PriorityMode, ExclusionMode, ALLOWED_SAMPLE_RATES
 from drivers.base_driver import BaseScannerDriver, ScannerStatus
 from drivers.driver_factory import create_driver_for_model
 from feeder.scanscribe_feeder import ScanScribeFeeder, CallTransmissionPayload
@@ -149,6 +149,9 @@ class SyncManager:
                 stream = self.audio_recorder.streams.get(scanner_id) if hasattr(self.audio_recorder, "streams") else None
                 in_rate = stream.sample_rate if (stream and getattr(stream, "sample_rate", None)) else getattr(self.audio_recorder, "sample_rate", 44100)
             target_rate = self.config.feeder.sample_rate or 16000
+            if target_rate not in ALLOWED_SAMPLE_RATES:
+                logger.warning(f"feeder.sample_rate {target_rate} not in supported rates {ALLOWED_SAMPLE_RATES}. Falling back to 16000.")
+                target_rate = 16000
             dispatch_pcm = resample_pcm_int16(pcm_bytes, in_rate, target_rate)
 
             sc_cfg = self.config.scanner_a if scanner_id == "scanner_a" else self.config.scanner_b

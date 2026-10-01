@@ -28,8 +28,60 @@ High-performance mutual exclusion and audio recording controller for dual Uniden
 ## Quick Start
 
 ### 1. Requirements & Setup
+
+#### Linux Quick Deploy (Raspberry Pi, Debian, Ubuntu, Fedora, Arch)
+
+`install.sh` automates system dependency installation (PortAudio, ALSA, Python headers, Tkinter), user permissions (`dialout` / `audio` groups), virtual environment creation, pip requirements, hardware discovery, and systemd service generation.
+
 ```bash
-# Clone the repository
+# 1. Clone the repository
+git clone https://github.com/xxbubziexx/Scanner_Controller.git
+cd Scanner_Controller
+
+# 2. Run the automated installer
+# System-wide production deploy (installs to /opt/scanner_controller + enables systemd service):
+sudo ./install.sh --system --start
+
+# Or local user deploy (installs in-place in current directory):
+./install.sh --local
+```
+
+##### Installer Command-Line Options:
+| Flag | Description | Default |
+|---|---|---|
+| `--system` | Deploys system-wide to `/opt/scanner_controller` & sets up systemd service | Disabled |
+| `--local` | Installs dependencies and virtual environment in current directory | Current repo |
+| `--dir <path>` | Custom target directory | `/opt/scanner_controller` |
+| `--user <username>` | Target user to own files and run the systemd service | `$SUDO_USER` or current user |
+| `--service` / `--no-service` | Enable or skip systemd service installation | Enabled in `--system` |
+| `--start` | Start the systemd service immediately after install | Disabled |
+| `--port <port>` | Web UI & API port | `8000` |
+| `--inbox <path>` | ScanScribe recording inbox destination directory | `/var/scanscribe/inbox` |
+| `--no-deps` | Skip system package manager (`apt`/`dnf`/`pacman`) | Disabled |
+| `-y`, `--yes`, `--non-interactive` | Accept all prompts and run non-interactively | Disabled |
+
+##### Managing the Linux Systemd Service:
+```bash
+# Check service status & telemetry
+sudo systemctl status scanscribe-scanner
+
+# Follow live service logs
+sudo journalctl -u scanscribe-scanner -f
+
+# Restart or stop the service
+sudo systemctl restart scanscribe-scanner
+sudo systemctl stop scanscribe-scanner
+```
+
+##### Linux Serial & Audio Hardware Notes:
+- **Serial Ports**: Uniden USB scanners expose `/dev/ttyACM0` (or `/dev/ttyUSB0`). The installer adds your user to the `dialout` (or `uucp`) group. Log out and back in once after installation for group changes to take full effect.
+- **Audio Capture**: ALSA/PortAudio capture requires membership in the `audio` group (handled automatically by `install.sh`).
+- **Inbox Directory**: Audio files and optional JSON sidecars will drop into `/var/scanscribe/inbox` (or the configured path) with full read/write permissions for the service user.
+
+
+#### Windows Setup
+```bash
+# Clone and enter repo
 git clone https://github.com/xxbubziexx/Scanner_Controller.git
 cd Scanner_Controller
 
@@ -41,13 +93,17 @@ pip install -r requirements.txt
 ```bash
 python gui.py
 ```
-Or run the standalone pre-compiled executable:
+Or run the standalone pre-compiled executable on Windows:
 ```bash
 dist\ScannerControllerGUI.exe
 ```
 
 ### 3. Run the Web Server / Daemon
 ```bash
+# On Linux using runner script:
+./run.sh
+
+# Or directly:
 python server.py
 ```
 Open your browser at `http://127.0.0.1:8000` to access the web controller.

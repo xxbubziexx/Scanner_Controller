@@ -638,6 +638,9 @@ function openSettingsModal() {
         if (cfg.feeder) {
           document.getElementById("cfg_feeder_mode").value = cfg.feeder.feeder_mode;
           document.getElementById("cfg_feeder_format").value = cfg.feeder.audio_format;
+          if (document.getElementById("cfg_feeder_sample_rate")) {
+            document.getElementById("cfg_feeder_sample_rate").value = String(cfg.feeder.sample_rate || 16000);
+          }
           document.getElementById("cfg_feeder_inbox").value = cfg.feeder.inbox_directory;
         }
 
@@ -716,6 +719,9 @@ function saveConfiguration(event) {
   if (cfg.feeder) {
     cfg.feeder.feeder_mode = document.getElementById("cfg_feeder_mode").value;
     cfg.feeder.audio_format = document.getElementById("cfg_feeder_format").value;
+    if (document.getElementById("cfg_feeder_sample_rate")) {
+      cfg.feeder.sample_rate = parseInt(document.getElementById("cfg_feeder_sample_rate").value, 10);
+    }
     cfg.feeder.inbox_directory = document.getElementById("cfg_feeder_inbox").value;
   }
 
