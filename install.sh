@@ -2,6 +2,8 @@
 # ==============================================================================
 # Uniden Scanner Mutual Exclusion & Recording Controller
 # Automated Production Installer for Linux (Debian, Ubuntu, Raspberry Pi OS, etc.)
+# Supports the Rust single-binary daemon (`scanner-controller`) and instant
+# one-command Python rollback (`--rollback-python`).
 # ==============================================================================
 set -euo pipefail
 
@@ -27,6 +29,7 @@ PORT="$DEFAULT_PORT"
 INBOX_DIR="$DEFAULT_INBOX_DIR"
 SKIP_SYS_DEPS=0
 NON_INTERACTIVE=0
+ROLLBACK_PYTHON=0
 
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
@@ -40,7 +43,7 @@ print_banner() {
    ___) | (_| (_| | | | | | | |  __/ |  | |__| (_) | | | | |_| | | (_) | | |  __/ |   
   |____/ \___\__,_|_| |_|_| |_|\___|_|   \____\___/|_| |_|\__|_|  \___/|_|_|\___|_|   
                                                                                       
-             Automated Linux Fast Deployment & Systemd Installer
+         Automated Linux Rust Deployment, Systemd & Rollback Installer
 ==============================================================================
 EOF
 }
@@ -60,6 +63,7 @@ Options:
   --port <port>         Web UI and API port (default: ${DEFAULT_PORT}).
   --inbox <path>        ScanScribe feeder inbox path (default: ${DEFAULT_INBOX_DIR}).
   --no-deps             Skip system package manager (apt/dnf/pacman) installation.
+  --rollback-python     Switch scanscribe-scanner.service back to the Python reference runtime.
   -y, --yes, --non-interactive
                         Accept all defaults and install non-interactively.
   -h, --help            Show this help message.
@@ -68,6 +72,7 @@ Examples:
   sudo ./install.sh --system --start
   ./install.sh --local
   sudo ./install.sh --system --user pi --inbox /data/inbox
+  sudo ./install.sh --system --rollback-python --start
 EOF
     exit 0
 }
@@ -113,6 +118,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-deps)
             SKIP_SYS_DEPS=1
+            shift
+            ;;
+        --rollback-python)
+            ROLLBACK_PYTHON=1
             shift
             ;;
         -y|--yes|--non-interactive)
@@ -170,7 +179,13 @@ if [[ -z "$INSTALL_SERVICE" ]]; then
     fi
 fi
 
+RUNTIME_LABEL="Rust (scanner-controller)"
+if [[ "$ROLLBACK_PYTHON" -eq 1 ]]; then
+    RUNTIME_LABEL="Python Rollback (uvicorn server:app)"
+fi
+
 echo -e "${CYAN}Configuration Summary:${NC}"
+echo -e "  - Active Runtime:     ${BOLD}${RUNTIME_LABEL}${NC}"
 echo -e "  - Deployment Mode:    ${BOLD}${INSTALL_MODE}${NC}"
 echo -e "  - Install Directory:  ${BOLD}${TARGET_DIR}${NC}"
 echo -e "  - Service User:       ${BOLD}${TARGET_USER}${NC}"
@@ -227,43 +242,45 @@ if [[ "$SKIP_SYS_DEPS" -eq 0 ]]; then
         echo -e "${GREEN}Detected Debian / Ubuntu / Raspberry Pi OS (apt-get)${NC}"
         run_as_root apt-get update -y
         run_as_root apt-get install -y --no-install-recommends \
+            libasound2 \
+            libasound2-dev \
+            libudev1 \
+            libudev-dev \
+            pkg-config \
+            build-essential \
             python3 \
             python3-pip \
             python3-venv \
-            python3-dev \
             libportaudio2 \
-            portaudio19-dev \
-            libasound2-dev \
-            python3-tk \
-            build-essential \
             curl \
             git
     elif command -v dnf &>/dev/null; then
         echo -e "${GREEN}Detected Fedora / RHEL (dnf)${NC}"
         run_as_root dnf install -y \
+            alsa-lib \
+            alsa-lib-devel \
+            systemd-devel \
+            pkgconf-pkg-config \
+            gcc \
             python3 \
             python3-pip \
-            python3-devel \
             portaudio \
-            portaudio-devel \
-            alsa-lib-devel \
-            python3-tkinter \
-            gcc \
             curl \
             git
     elif command -v pacman &>/dev/null; then
         echo -e "${GREEN}Detected Arch Linux (pacman)${NC}"
         run_as_root pacman -Sy --noconfirm \
+            alsa-lib \
+            systemd-libs \
+            pkgconf \
+            base-devel \
             python \
             python-pip \
             portaudio \
-            alsa-lib \
-            tk \
-            base-devel \
             curl \
             git
     else
-        echo -e "${YELLOW}[WARNING] Unknown package manager. Please ensure Python 3, venv, and PortAudio (libportaudio2) are installed.${NC}"
+        echo -e "${YELLOW}[WARNING] Unknown package manager. Please ensure ALSA (libasound2) and libudev are installed.${NC}"
     fi
 else
     echo -e "\n${YELLOW}[1/6] Skipping system package installation (--no-deps specified).${NC}"
@@ -273,13 +290,11 @@ fi
 echo -e "\n${CYAN}[2/6] Configuring user permissions for serial ports and audio hardware...${NC}"
 GROUPS_TO_ADD=""
 if id "$TARGET_USER" &>/dev/null; then
-    # Dialout / uucp for serial access
     if getent group dialout &>/dev/null; then
         GROUPS_TO_ADD="dialout"
     elif getent group uucp &>/dev/null; then
         GROUPS_TO_ADD="uucp"
     fi
-    # Audio group
     if getent group audio &>/dev/null; then
         GROUPS_TO_ADD="${GROUPS_TO_ADD:+$GROUPS_TO_ADD,}audio"
     fi
@@ -292,26 +307,34 @@ else
     echo -e "${YELLOW}[WARNING] Target user '${TARGET_USER}' not found; skipping group configuration.${NC}"
 fi
 
-# 3. Setup Target Installation Directory
+# 3. Setup Target Installation Directory (Prime Directive #5: Never overwrite config.json or recordings)
 echo -e "\n${CYAN}[3/6] Deploying application files to ${TARGET_DIR}...${NC}"
+if [[ -f "${TARGET_DIR}/config.json" ]]; then
+    echo -e "${GREEN}Backing up existing ${TARGET_DIR}/config.json -> ${TARGET_DIR}/config.json.bak${NC}"
+    run_as_root cp -p "${TARGET_DIR}/config.json" "${TARGET_DIR}/config.json.bak"
+fi
+
 if [[ "$TARGET_DIR" != "$SOURCE_DIR" ]]; then
     run_as_root mkdir -p "$TARGET_DIR"
-    echo -e "Copying repository files from ${SOURCE_DIR} to ${TARGET_DIR}..."
+    echo -e "Copying repository files from ${SOURCE_DIR} to ${TARGET_DIR} (preserving config.json and recordings)..."
     if command -v rsync &>/dev/null; then
-        run_as_root rsync -a --delete \
+        run_as_root rsync -a \
             --exclude="venv" \
             --exclude=".git" \
             --exclude="__pycache__" \
             --exclude="*.pyc" \
-            --exclude="dist" \
-            --exclude="build" \
+            --exclude="rust/target" \
+            --exclude="config.json" \
+            --exclude="recordings" \
             "$SOURCE_DIR/" "$TARGET_DIR/"
     else
-        run_as_root cp -rT "$SOURCE_DIR" "$TARGET_DIR"
+        run_as_root cp -rn "$SOURCE_DIR/"* "$TARGET_DIR/" || true
+    fi
+    if [[ ! -f "${TARGET_DIR}/config.json" && -f "${SOURCE_DIR}/config.json" ]]; then
+        run_as_root cp "${SOURCE_DIR}/config.json" "${TARGET_DIR}/config.json"
     fi
 fi
 
-# Ensure target directory ownership
 if [[ "$IS_ROOT" -eq 1 || "$INSTALL_MODE" == "system" ]]; then
     run_as_root chown -R "${TARGET_USER}:${TARGET_USER}" "$TARGET_DIR"
 fi
@@ -322,28 +345,49 @@ run_as_root mkdir -p "$INBOX_DIR"
 run_as_root chown -R "${TARGET_USER}:${TARGET_USER}" "$INBOX_DIR"
 run_as_root chmod 775 "$INBOX_DIR"
 
-# 4. Set Up Python Virtual Environment & Install Dependencies
-echo -e "\n${CYAN}[4/6] Setting up Python virtual environment in ${TARGET_DIR}/venv...${NC}"
-VENV_DIR="${TARGET_DIR}/venv"
-VENV_PYTHON="${VENV_DIR}/bin/python3"
-VENV_PIP="${VENV_DIR}/bin/pip"
+# 4. Install or Build Rust Binary (and optionally Python rollback environment)
+echo -e "\n${CYAN}[4/6] Installing scanner-controller binary...${NC}"
+RUST_BIN="${TARGET_DIR}/scanner-controller"
 
-if [[ ! -d "$VENV_DIR" ]]; then
-    run_as_target_user python3 -m venv "$VENV_DIR"
+if [[ -f "${SOURCE_DIR}/dist/scanner-controller" ]]; then
+    echo -e "${GREEN}Installing prebuilt binary from ${SOURCE_DIR}/dist/scanner-controller...${NC}"
+    run_as_root cp "${SOURCE_DIR}/dist/scanner-controller" "$RUST_BIN"
+    run_as_root chmod 755 "$RUST_BIN"
+elif [[ -f "${SOURCE_DIR}/rust/target/release/scanner-controller" ]]; then
+    echo -e "${GREEN}Installing release binary from ${SOURCE_DIR}/rust/target/release/scanner-controller...${NC}"
+    run_as_root cp "${SOURCE_DIR}/rust/target/release/scanner-controller" "$RUST_BIN"
+    run_as_root chmod 755 "$RUST_BIN"
+elif command -v cargo &>/dev/null && [[ -d "${SOURCE_DIR}/rust" ]]; then
+    echo -e "${CYAN}Building release binary from source via Cargo...${NC}"
+    (cd "${SOURCE_DIR}/rust" && run_as_target_user cargo build --release --bin scanner-controller)
+    run_as_root cp "${SOURCE_DIR}/rust/target/release/scanner-controller" "$RUST_BIN"
+    run_as_root chmod 755 "$RUST_BIN"
+else
+    echo -e "${YELLOW}[WARNING] No prebuilt scanner-controller binary or cargo toolchain found.${NC}"
 fi
 
-echo -e "Upgrading pip, setuptools, and wheel..."
-run_as_target_user "$VENV_PYTHON" -m pip install --upgrade pip setuptools wheel -q
+VENV_DIR="${TARGET_DIR}/venv"
+VENV_PYTHON="${VENV_DIR}/bin/python3"
+if [[ "$ROLLBACK_PYTHON" -eq 1 ]]; then
+    echo -e "\n${CYAN}Ensuring Python rollback virtualenv in ${VENV_DIR}...${NC}"
+    if [[ ! -d "$VENV_DIR" ]]; then
+        run_as_target_user python3 -m venv "$VENV_DIR"
+    fi
+    run_as_target_user "$VENV_PYTHON" -m pip install --upgrade pip setuptools wheel -q
+    run_as_target_user "${VENV_DIR}/bin/pip" install -r "${TARGET_DIR}/requirements.txt"
+fi
 
-echo -e "Installing Python requirements from ${TARGET_DIR}/requirements.txt..."
-run_as_target_user "$VENV_PIP" install -r "${TARGET_DIR}/requirements.txt"
-
-# 5. Configure Systemd Service
+# 5. Configure Systemd Service (keeps scanscribe-scanner.service name)
 if [[ "$INSTALL_SERVICE" -eq 1 ]]; then
     echo -e "\n${CYAN}[5/6] Creating systemd service (scanscribe-scanner.service)...${NC}"
     SERVICE_FILE="/etc/systemd/system/scanscribe-scanner.service"
-    
-    # Write dynamic systemd unit
+
+    if [[ "$ROLLBACK_PYTHON" -eq 1 ]]; then
+        EXEC_START="${VENV_PYTHON} -m uvicorn server:app --host 0.0.0.0 --port ${PORT}"
+    else
+        EXEC_START="${RUST_BIN} serve --host 0.0.0.0 --port ${PORT} --no-browser"
+    fi
+
     TMP_SERVICE="$(mktemp)"
     cat << EOF > "$TMP_SERVICE"
 [Unit]
@@ -354,16 +398,20 @@ After=network.target sound.target
 Type=simple
 User=${TARGET_USER}
 Group=${TARGET_USER}
+SupplementaryGroups=dialout audio
 WorkingDirectory=${TARGET_DIR}
-ExecStart=${VENV_PYTHON} -m uvicorn server:app --host 0.0.0.0 --port ${PORT}
+ExecStart=${EXEC_START}
+# Instant rollback reference:
+# Rust:   ${RUST_BIN} serve --host 0.0.0.0 --port ${PORT} --no-browser
+# Python: ${VENV_PYTHON} -m uvicorn server:app --host 0.0.0.0 --port ${PORT}
 Restart=always
 RestartSec=5
+Environment=RUST_LOG=info
 Environment=PYTHONUNBUFFERED=1
 Environment=SCANSCRIBE_INBOX_DIR=${INBOX_DIR}
 Environment=SCANNER_A_PORT=/dev/ttyACM0
 Environment=SCANNER_B_PORT=NONE
 
-# Standard permissions and capabilities
 LimitNOFILE=65535
 
 [Install]
@@ -388,82 +436,12 @@ else
     echo -e "\n${YELLOW}[5/6] Skipping systemd service setup.${NC}"
 fi
 
-# 6. Verification and Hardware Discovery
-echo -e "\n${CYAN}[6/6] Verifying installation and hardware devices...${NC}"
-run_as_target_user "$VENV_PYTHON" - << 'PYEOF'
-import sys
-
-print("  - Python version:", sys.version.split()[0])
-
-modules = [
-    ("fastapi", "FastAPI"),
-    ("uvicorn", "Uvicorn ASGI Server"),
-    ("sounddevice", "SoundDevice (PortAudio Audio I/O)"),
-    ("serial", "PySerial (Scanner COM I/O)"),
-    ("mutagen", "Mutagen (ID3 / Broadcast Metadata)"),
-    ("lameenc", "Lameenc (MP3 Encoding Engine)"),
-    ("numpy", "NumPy (DSP / Vox Audio Processing)"),
-]
-
-all_ok = True
-for mod, desc in modules:
-    try:
-        __import__(mod)
-        print(f"    [OK] {desc}")
-    except Exception as e:
-        print(f"    [FAIL] {desc}: {e}")
-        all_ok = False
-
-if not all_ok:
-    print("\n[WARNING] Some Python libraries failed to import properly.")
-else:
-    print("\n  - All core dependencies loaded successfully!")
-
-# Check audio devices
-try:
-    import sounddevice as sd
-    devices = sd.query_devices()
-    print(f"  - Detected {len(devices)} audio device(s) via PortAudio.")
-except Exception as e:
-    print(f"  - Audio device query note: {e}")
-
-# Check serial devices
-import glob
-serial_ports = sorted(glob.glob("/dev/ttyACM*") + glob.glob("/dev/ttyUSB*"))
-if serial_ports:
-    print(f"  - Detected serial scanner ports: {', '.join(serial_ports)}")
-else:
-    print("  - No /dev/ttyACM* or /dev/ttyUSB* devices detected currently.")
-    print("    (Plug in your Uniden scanner via USB and set to Serial / Mass Storage mode OFF)")
-PYEOF
-
-echo -e "\n${GREEN}==============================================================================${NC}"
-echo -e "${BOLD}${GREEN}Installation Complete!${NC}"
-echo -e "${GREEN}==============================================================================${NC}"
-echo -e "Installation path: ${BOLD}${TARGET_DIR}${NC}"
-echo -e "Virtualenv Python: ${BOLD}${VENV_PYTHON}${NC}"
-echo -e "Inbox directory:   ${BOLD}${INBOX_DIR}${NC}"
-echo -e "Web Interface URL: ${BOLD}http://<your-ip>:${PORT}${NC}"
-echo ""
-
-if [[ "$INSTALL_SERVICE" -eq 1 ]]; then
-    echo -e "${CYAN}Service Management Commands:${NC}"
-    echo -e "  - Start service:   ${BOLD}sudo systemctl start scanscribe-scanner${NC}"
-    echo -e "  - Stop service:    ${BOLD}sudo systemctl stop scanscribe-scanner${NC}"
-    echo -e "  - Check status:    ${BOLD}sudo systemctl status scanscribe-scanner${NC}"
-    echo -e "  - View live logs:  ${BOLD}sudo journalctl -u scanscribe-scanner -f${NC}"
-    echo ""
+# 6. Verification
+echo -e "\n${CYAN}[6/6] Verifying installation...${NC}"
+if [[ -x "$RUST_BIN" ]]; then
+    echo -e "  - Rust binary installed: ${GREEN}$("$RUST_BIN" --version)${NC}"
 fi
-
-echo -e "${CYAN}Manual Standalone Launch:${NC}"
-echo -e "  cd ${TARGET_DIR}"
-echo -e "  ./run.sh"
-echo -e "  # Or directly:"
-echo -e "  ${VENV_PYTHON} -m uvicorn server:app --host 0.0.0.0 --port ${PORT}"
-echo ""
-
-if [[ -n "${GROUPS_TO_ADD:-}" ]]; then
-    echo -e "${YELLOW}[NOTE] If user '${TARGET_USER}' was added to dialout/audio groups,${NC}"
-    echo -e "${YELLOW}       log out and log back in (or run 'newgrp dialout') for permissions to take effect.${NC}"
-fi
-echo -e "${GREEN}==============================================================================${NC}"
+echo -e "\n${GREEN}${BOLD}Installation Complete!${NC}"
+echo -e "  - Web Dashboard: ${CYAN}http://localhost:${PORT}${NC}"
+echo -e "  - Service Status: ${CYAN}sudo systemctl status scanscribe-scanner${NC}"
+echo -e "  - Instant Python Rollback: ${YELLOW}sudo ./install.sh --system --rollback-python --start${NC}"

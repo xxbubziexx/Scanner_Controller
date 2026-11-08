@@ -18,6 +18,7 @@ sc-audio = { path = "../../crates/sc-audio" }
 sc-feeder = { path = "../../crates/sc-feeder" }
 sc-engine = { path = "../../crates/sc-engine" }
 sc-server = { path = "../../crates/sc-server" }
+sc-desktop = { path = "../../crates/sc-desktop" }
 anyhow = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }

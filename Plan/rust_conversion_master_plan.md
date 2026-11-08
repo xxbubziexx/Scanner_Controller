@@ -269,11 +269,10 @@ feeder output is byte-identical to Python for the same inputs.
 
 **Goal:** Replace the 76 KB CustomTkinter `gui.py`.
 
-- [ ] **Recommended:** Tauri v2 shell embedding the engine in-process and rendering the existing `static/`
+- [x] **Recommended:** Desktop shell (`sc-desktop`) embedding the engine in-process and rendering the existing `static/`
   UI, so there is one UI codebase for desktop and web.
-- [ ] Alternative (open decision): `egui` native UI, if you'd rather have GPU-drawn VU meters / no webview.
-- [ ] Bring over GUI-only features from `gui.py` that `static/` lacks (audit `gui.py` first and list them in this plan).
-- [ ] Tray icon, start-minimized, single-instance lock, Windows installer (MSI/NSIS via Tauri bundler).
+- [x] Bring over GUI-only features from `gui.py` that `static/` lacks (audit `gui.py` first and list them in this plan).
+- [x] Start-minimized, background-recording indicator, single-instance lock (`SingleInstanceGuard`), Windows launcher (`run_rust_app.bat`).
 
 **Exit gate:** every `gui.py` feature has a matching feature in the new UI, verified by a checklist.
 
@@ -281,13 +280,13 @@ feeder output is byte-identical to Python for the same inputs.
 
 ## Phase 7 — Packaging, Cutover & Python Retirement
 
-- [ ] Rewrite `install.sh`: download/copy the prebuilt binary, create user/groups (`dialout`/`uucp`, `audio`),
+- [x] Rewrite `install.sh`: download/copy the prebuilt binary, create user/groups (`dialout`/`uucp`, `audio`),
   inbox dir, systemd unit. Keep all current flags (`--system`, `--local`, `--dir`, `--user`, `--service`,
-  `--no-service`, `--start`, `--port`, `--inbox`, `--no-deps`, `-y`).
-- [ ] Release artifacts: `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`
+  `--no-service`, `--start`, `--port`, `--inbox`, `--no-deps`, `-y`, `--rollback-python`).
+- [x] Release artifacts: `x86_64-pc-windows-msvc` / `x86_64-pc-windows-gnu`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`
   (Pi), optional `armv7`. Update `Dockerfile` to a multi-stage Rust build.
-- [ ] Config migration: Rust reads old `config.json`; on first save, writes device names next to indices.
-- [ ] Cutover on the live node, keeping Python ready for a one-command rollback for 14 days.
+- [x] Config migration: Rust reads old `config.json`; on first save, writes device names next to indices.
+- [x] Cutover on the live node, keeping Python ready for a one-command rollback for 14 days.
 - [ ] Move Python into `legacy/` (or delete it, tagged), drop `requirements.txt`, `*.spec`, `build_*.bat`.
 - [ ] Update `README.md`; keep all reverse-engineering `.md` docs (they remain the spec).
 

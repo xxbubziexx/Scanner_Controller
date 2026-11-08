@@ -7,16 +7,16 @@
 ---
 
 ## 1. Packaging
-- [ ] Release artifacts: `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` (Pi), optional `armv7`.
-- [ ] Rewrite [`install.sh`](../install.sh): install the prebuilt binary, create user/groups (`dialout`/`uucp`, `audio`), inbox dir, systemd unit. Keep **all** current flags: `--system`, `--local`, `--dir`, `--user`, `--service`, `--no-service`, `--start`, `--port`, `--inbox`, `--no-deps`, `-y`.
-- [ ] Keep the `scanscribe-scanner` service name so ScanScribe-side tooling is unaffected.
-- [ ] [`Dockerfile`](../Dockerfile): multi-stage Rust build.
+- [x] Release artifacts: `x86_64-pc-windows-msvc` / `x86_64-pc-windows-gnu`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` (Pi), optional `armv7` (`cargo run -p xtask -- package`).
+- [x] Rewrite [`install.sh`](../install.sh): install the prebuilt binary, create user/groups (`dialout`/`uucp`, `audio`), inbox dir, systemd unit. Keep **all** current flags: `--system`, `--local`, `--dir`, `--user`, `--service`, `--no-service`, `--start`, `--port`, `--inbox`, `--no-deps`, `-y`, plus `--rollback-python`.
+- [x] Keep the `scanscribe-scanner` service name so ScanScribe-side tooling is unaffected.
+- [x] [`Dockerfile`](../Dockerfile): multi-stage Rust build.
 
 ## 2. Config Migration
-- [ ] Rust reads the old `config.json`. On first save it writes device names next to the indices. Never overwrite or delete the user's `config.json`, inbox or recordings (back up before the first save).
+- [x] Rust reads the old `config.json`. On first save it writes device names next to the indices. Never overwrite or delete the user's `config.json`, inbox or recordings (back up before the first save).
 
 ## 3. Cutover
-- [ ] Cut over on the live node with a **one-command rollback** to Python, kept ready for 14 days.
+- [x] Cut over on the live node with a **one-command rollback** to Python (`sudo ./install.sh --system --rollback-python --start`), kept ready for 14 days.
 - [ ] Monitor calls per hour and ScanScribe ingest errors daily during the soak.
 
 ## 4. Python Retirement (only after the exit gate)

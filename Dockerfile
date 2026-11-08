@@ -1,32 +1,45 @@
-# Production Multi-Arch Dockerfile for Linux / Raspberry Pi / x86_64
-FROM python:3.11-slim
+# ============================================================================
+# Stage 1: Rust Builder
+# ============================================================================
+FROM rust:1.83-bookworm AS builder
 
-WORKDIR /app
-
-# Install curl for container health check
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+    pkg-config \
+    libasound2-dev \
+    libudev-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /src
+COPY rust/ ./rust/
+COPY static/ ./static/
+COPY config.json* ./
 
-# Copy application source
-COPY . .
+WORKDIR /src/rust
+RUN cargo build --release --bin scanner-controller
 
-# Environment defaults for containerized Linux deployment
-ENV PYTHONUNBUFFERED=1 \
-    SCANSCRIBE_INBOX_DIR=/data/inbox \
-    SCANNER_A_PORT=/dev/ttyACM0 \
-    SCANNER_B_PORT=NONE
+# ============================================================================
+# Stage 2: Minimal Runtime Container
+# ============================================================================
+FROM debian:bookworm-slim
 
-# Expose Web UI & WebSocket server
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libasound2 \
+    libudev1 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /src/rust/target/release/scanner-controller /usr/local/bin/scanner-controller
+COPY static/ /app/static/
+
+RUN mkdir -p /var/scanscribe/inbox /app/recordings
+
+ENV SCANSCRIBE_INBOX_DIR=/var/scanscribe/inbox
+ENV SCANNER_A_PORT=/dev/ttyACM0
+ENV SCANNER_B_PORT=/dev/ttyACM1
+ENV RUST_LOG=info
+
 EXPOSE 8000
 
-# Health check endpoint
-HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
-  CMD curl -f http://localhost:8000/api/state || exit 1
-
-# Launch ASGI server
-CMD ["python", "-m", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/usr/local/bin/scanner-controller", "serve", "--host", "0.0.0.0", "--port", "8000", "--no-browser"]

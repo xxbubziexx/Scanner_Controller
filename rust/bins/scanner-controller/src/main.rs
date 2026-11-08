@@ -16,6 +16,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use sc_core::AppConfig;
+use sc_desktop::{run_desktop_app, DesktopShellConfig};
 use sc_discovery::{detect_serial_ports, discover_lan_scanners};
 use sc_drivers::normalize_port_name;
 use sc_server::run_hardware_server;
@@ -35,7 +36,26 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Start the live Scanner Sync Engine and Web Control Dashboard (default when no subcommand is given).
+    /// Launch the Desktop Application Shell (single-instance lock + embedded engine + native app window).
+    Desktop {
+        /// Host address to bind (default 127.0.0.1).
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+
+        /// TCP port for the embedded UI and REST/WebSocket API.
+        #[arg(long, default_value_t = 8000)]
+        port: u16,
+
+        /// Path to config.json (defaults to ./config.json or ../config.json).
+        #[arg(long)]
+        config: Option<PathBuf>,
+
+        /// Start minimized in the background without opening a foreground window.
+        #[arg(long)]
+        start_minimized: bool,
+    },
+
+    /// Start the headless/web Scanner Sync Engine and Web Control Dashboard.
     Serve {
         /// Host address to bind (e.g. 127.0.0.1 or 0.0.0.0).
         #[arg(long, default_value = "127.0.0.1")]
@@ -179,6 +199,45 @@ async fn run_serve(
     Ok(())
 }
 
+async fn run_desktop(
+    host: &str,
+    port: u16,
+    explicit_cfg: Option<PathBuf>,
+    start_minimized: bool,
+) -> Result<()> {
+    let cfg_path = resolve_config_path(explicit_cfg);
+    let config = if cfg_path.exists() {
+        tracing::info!(path = %cfg_path.display(), "Loading configuration from disk");
+        AppConfig::load_from_file(&cfg_path).unwrap_or_else(|err| {
+            tracing::warn!(error = %err, "Failed to parse config.json; using defaults");
+            AppConfig::default()
+        })
+    } else {
+        tracing::info!("No config.json found; starting with default configuration");
+        AppConfig::default()
+    };
+
+    let shutdown_token = CancellationToken::new();
+    let signal_token = shutdown_token.clone();
+    tokio::spawn(async move {
+        if tokio::signal::ctrl_c().await.is_ok() {
+            tracing::info!("Ctrl+C received; initiating graceful shutdown...");
+            signal_token.cancel();
+        }
+    });
+
+    let shell_cfg = DesktopShellConfig {
+        host: host.to_string(),
+        port,
+        start_minimized,
+        config_path: Some(cfg_path),
+        ..DesktopShellConfig::default()
+    };
+
+    run_desktop_app(config, shell_cfg, shutdown_token).await?;
+    Ok(())
+}
+
 #[allow(clippy::print_stdout)]
 fn run_detect(lan: bool, active_ports: &[String], as_json: bool) -> Result<()> {
     let serial_ports = detect_serial_ports(active_ports);
@@ -302,7 +361,13 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
     match cli.command {
-        None => run_serve("127.0.0.1", 8000, None, false).await,
+        None => run_desktop("127.0.0.1", 8000, None, false).await,
+        Some(Commands::Desktop {
+            host,
+            port,
+            config,
+            start_minimized,
+        }) => run_desktop(&host, port, config, start_minimized).await,
         Some(Commands::Serve {
             host,
             port,

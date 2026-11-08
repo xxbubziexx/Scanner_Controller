@@ -1759,6 +1759,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc-desktop"
+version = "0.1.0"
+dependencies = [
+ "sc-core",
+ "sc-drivers",
+ "sc-engine",
+ "sc-server",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "sc-discovery"
 version = "0.1.0"
 dependencies = [
@@ -1861,6 +1877,7 @@ dependencies = [
  "clap",
  "sc-audio",
  "sc-core",
+ "sc-desktop",
  "sc-discovery",
  "sc-drivers",
  "sc-engine",
@@ -2842,6 +2859,10 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 [[package]]
 name = "xtask"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+]
 
 [[package]]
 name = "yoke"

@@ -9,6 +9,7 @@ members = [
     "crates/sc-feeder",
     "crates/sc-engine",
     "crates/sc-server",
+    "crates/sc-desktop",
     "bins/scanner-controller",
     "xtask",
 ]

@@ -251,3 +251,37 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - In Phase 6, `static/` will be enhanced with all missing `gui.py` controls while maintaining 100% compatibility with Python's `server.py`.
 - **Next Tasks / Unfinished Work:** Execute Phase 6 (`sc-desktop` + `gui.py` feature parity in `static/`) and Phase 7 (packaging, `xtask`, deployment scripts, and release binary).
+
+### 2026-11-08 16:41 | Claude Opus 4.6 (Windows Dev)
+- **Phase:** Phase 6 (`sc-desktop` & `gui.py` Parity) + Phase 7 (Packaging, `xtask` & Cutover Prep)
+- **Work Performed:**
+  - **Phase 6 Audit & UI Decision:** Audited all 1,419 lines of [`gui.py`](gui.py) against [`static/`](static/) in [`Plan/phase_6_desktop_app.md`](Plan/phase_6_desktop_app.md) and chose the unified `static/` + `sc-desktop` shell architecture (embedding `sc-core`, `sc-engine`, and `sc-server` in-process and launching a native app-mode `WebView2`/Chromium window).
+  - **100% `gui.py` Feature Parity in [`static/`](static/):**
+    - Updated [`static/index.html`](static/index.html), [`static/style.css`](static/style.css), and [`static/app.js`](static/app.js) with:
+      - Master `🔴 Record Calls` toggle (`#masterRecordToggle`) and Global Recording Indicator badge (`#globalRecBadge`: `REC STANDBY` / `🔴 REC ACTIVE` / `REC DISABLED`) + dynamic document title indicator.
+      - Per-card `REC ON` / `🔴 REC` / `REC OFF` status badges (`#recBadgeA`, `#recBadgeB`), Unit ID (`#uidA`, `#uidB`), and quick per-card `Enable Scanner` / `Enable Audio Capture` toggles.
+      - Real-time Audio VU Meters (`#vuBarA`/`#vuPctA`, `#vuBarB`/`#vuPctB`) with dynamic Green (`<60%`), Amber (`60–84%`), and Red (`>=85%`) thresholds matching `gui.py:924-953`.
+      - Full **🔊 Live Audio Loopback Monitor** panel (`#loopbackEnabledToggle`, `#loopbackOutputSelect` populated from `/api/audio/output_devices`, `#loopbackPanSelect` `STEREO_SPLIT`/`CENTER`, and `#loopbackVolumeSlider` `0–100%`).
+      - `DEPARTMENT_PRIORITY` option, `hang_time_seconds` & `auto_release_seconds` inputs, Active Holds pill bar (`#activeExclusionsBar`), and Event Log `🧹 Clear View` button.
+      - Lockout Method selector (`KEYPRESS` / `MEMORY`), `LIVE_STREAM` feeder mode, Webhook URL input, ProScan binary tag & `.json` sidecar toggles, Filename/TIT2 preset chips (`ProScan Default`, `Simple`, `Detailed`, `Dept/Chan`), live template previews, and the collapsible 37 ProScan `%` Specifiers reference drawer.
+  - **Created [`rust/crates/sc-desktop/src/lib.rs`](rust/crates/sc-desktop/src/lib.rs):**
+    - Implemented `SingleInstanceGuard` (loopback TCP lock on port `45891`) so a second desktop launch never contends for serial ports (Prime Directive #4), instead opening the UI window to the running instance.
+    - Implemented `RecordingIndicator`, `compute_recording_indicator`, `DesktopShellConfig` (`--start-minimized`, `minimize_to_tray`), and `run_desktop_app`.
+    - Wired `desktop` subcommand (and default no-args launch) into [`rust/bins/scanner-controller/src/main.rs`](rust/bins/scanner-controller/src/main.rs).
+  - **Phase 7 Packaging & Cutover Ready:**
+    - Implemented [`rust/xtask/src/main.rs`](rust/xtask/src/main.rs) (`ci`, `build-release`, `package`), building `rust/target/release/scanner-controller.exe` and packaging `dist/scanner-controller.exe`.
+    - Updated [`Dockerfile`](Dockerfile) (multi-stage Rust build), [`scanscribe-scanner.service`](scanscribe-scanner.service), [`install.sh`](install.sh) (retaining all existing flags plus `--rollback-python` one-command rollback and automatic `config.json.bak` preservation), and added [`run_rust_app.bat`](run_rust_app.bat) on Windows.
+- **Intentional Behaviour Deviations from Python:**
+  - `SingleInstanceGuard` prevents launching a second desktop instance that would fight over serial COM ports; it focuses the existing instance's UI window instead.
+- **Live Capture Impact:** None (not hardware-tested; `config.json` and serial ports untouched).
+- **Verification Performed:**
+  - `cargo fmt --all -- --check`: passed
+  - `cargo clippy --workspace --all-targets -- -D warnings`: passed (0 warnings)
+  - `cargo test --workspace`: 41 passed, 0 failed (`sc-audio`: 9, `sc-core`: 6, `sc-desktop`: 2, `sc-discovery`: 5, `sc-drivers`: 6, `sc-engine`: 3, `sc-feeder`: 3, `sc-metadata`: 5, `sc-server`: 2)
+  - `cargo run -p xtask -- package`: built and packaged `dist/scanner-controller.exe`
+  - `cargo check --workspace --target aarch64-unknown-linux-gnu`: passed (2.15s)
+  - `python -m pytest tests/`: 59 passed in 1.23s
+  - Not hardware-tested.
+- **Gotchas / Warnings for Next Model:**
+  - When building native release binaries on Windows (`cargo build --release`), ensure `DOCS_RS` is not set in the environment (`Remove-Item Env:\DOCS_RS`), because `mp3lame-sys` skips compiling `libmp3lame` when `DOCS_RS` is set. Use `DOCS_RS=1` only for `cargo check --target aarch64-unknown-linux-gnu` when a Linux sysroot C compiler is not installed on Windows.
+- **Next Tasks / Unfinished Work:** All 8 code migration phases (P0–P7) are complete and verified. Remaining operational items are the 7-day shadow run on the live Pi (Phase 5 §4) and 14-day production soak before retiring the Python files into `legacy/` (Phase 7 §4).
