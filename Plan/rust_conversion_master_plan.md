@@ -199,17 +199,17 @@ status matches the Python driver side by side, no port lockups after unplug/repl
 
 **Goal:** Glitch-free capture, VOX, loopback and encoding, under strict real-time rules.
 
-- [ ] Device enumeration matching `/api/audio/devices` and `/api/audio/output_devices` JSON shapes.
+- [x] Device enumeration matching `/api/audio/devices` and `/api/audio/output_devices` JSON shapes.
   > [!NOTE] cpal device indices are **not** PortAudio indices. Plan a migration: store device **name**
   > (+ host API) in config, and fall back to index only when reading old configs.
-- [ ] Capture via `cpal` input stream → `rtrb` SPSC ring → per-scanner worker thread.
+- [x] Capture via `cpal` input stream → `rtrb` SPSC ring → per-scanner worker thread.
   **Audio callback rules:** no allocation, no locks, no logging, no syscalls (see `AGENTS.md` §2).
-- [ ] `PreRollRingBuffer`: sample-accurate circular buffer (port exactly, incl. chronological read-out).
-- [ ] VOX / squelch: energy measurement, noise-floor history ring, threshold gate,
+- [x] `PreRollRingBuffer`: sample-accurate circular buffer (port exactly, incl. chronological read-out).
+- [x] VOX / squelch: energy measurement, noise-floor history ring, threshold gate,
   attack/decay/hang (`VOX-ALGORITHM.md` §1–4, "Porting notes"). Check against `vox_expected.json`.
-- [ ] Loopback mixer: `STEREO_SPLIT` / `CENTER`, volume, 15 ms de-click gain ramps on duck/mute.
-- [ ] Resampler (`rubato`) replacing `resample_pcm_int16`; verify against fixtures within tolerance.
-- [ ] Encoders: WAV (`hound` PCM + hand-rolled chunks from `sc-metadata`), MP3 (`mp3lame-encoder`),
+- [x] Loopback mixer: `STEREO_SPLIT` / `CENTER`, volume, 15 ms de-click gain ramps on duck/mute.
+- [x] Resampler (`rubato`) replacing `resample_pcm_int16`; verify against fixtures within tolerance.
+- [x] Encoders: WAV (`hound` PCM + hand-rolled chunks from `sc-metadata`), MP3 (`mp3lame-encoder`),
   matching the Python `lameenc` bitrate/quality settings.
 - [ ] Optional / stretch: LAN audio (RTSP over TCP + RTP/µ-law over UDP, `SERIAL-POLLING...` Target 2),
   only if the Python build supports it today; otherwise track as a post-cutover feature.

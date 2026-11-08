@@ -11,12 +11,12 @@ This living document is the **shared memory** between AI models, human developer
 
 ## 1. System Health & Current State
 
-- **Current Architecture Phase:** Phase 0, Phase 1 & Phase 2 complete; entering **Phase 3: `sc-audio` (Real-Time Audio Pipeline)**
-  (see [`Plan/phase_3_audio_pipeline.md`](Plan/phase_3_audio_pipeline.md)).
+- **Current Architecture Phase:** Phase 0, Phase 1, Phase 2 & Phase 3 complete; entering **Phase 4: `sc-engine` & `sc-feeder`**
+  (see [`Plan/phase_4_engine_and_feeder.md`](Plan/phase_4_engine_and_feeder.md)).
 - **Production Stack:** Python (FastAPI `server.py` headless / CustomTkinter `gui.py`), commit `7ed6a22`.
 - **Python Test Baseline:** `59 passed in 1.16s` (`python -m pytest tests/`, Python 3.11.9, tagged `python-baseline-v1`).
 - **Rust Toolchain:** rustc/cargo 1.99.1 (`stable-x86_64-pc-windows-gnu` host, `aarch64-unknown-linux-gnu` target installed).
-- **Active Focus:** Phase 3 — `sc-audio` (`PreRollRingBuffer`, VOX gate, resampler, `cpal` capture + loopback mixer via `rtrb`, WAV/MP3 encoders).
+- **Active Focus:** Phase 4 — `sc-engine` (`SyncManager` actor, mutual exclusion state machine, independent per-scanner polling) and `sc-feeder` (atomic `DIRECTORY_DROP` + `reqwest` multipart webhook + fallback inbox).
 
 ---
 
@@ -33,7 +33,9 @@ This living document is the **shared memory** between AI models, human developer
 - [x] Implement `sc-drivers`: `Transport` trait (`SerialTransport`, `TcpTransport`, `UdpTransport`, `ReplayTransport`), DMA parser/formatter, HomePatrol parser/formatter (`quick-xml`), Classic parser/formatter, 34-model `DriverFactory`.
 - [x] Implement `sc-discovery`: serial COM port scanner (with `active_ports` guard and VID/PID metadata) and LAN UDP detector (`SUS\r` on UDP 50536).
 - [x] Implement `scanner-controller` CLI binary with `detect` and `probe-keypad` subcommands.
-- [ ] Implement `sc-audio`: `PreRollRingBuffer`, `VoxGate`, de-click ramps, resampler, `cpal` + `rtrb` capture/loopback, WAV/MP3 encoders.
+- [x] Implement `sc-audio`: `PreRollRingBuffer`, `VoxGate` + `ProScanVoxEngine`, de-click ramps (`LoopbackMixer`), resamplers (`resample_pcm_int16` & `rubato`), `cpal` + `rtrb` capture/loopback, WAV (`hound` + `sc-metadata`) and MP3 (`mp3lame-encoder` + `sc-metadata`) encoders.
+- [ ] Implement `sc-feeder`: `CallTransmissionPayload`, `ScanScribeFeeder` (atomic `DIRECTORY_DROP`, `HTTP_WEBHOOK`, sidecar JSON, fallback inbox).
+- [ ] Implement `sc-engine`: `SyncManager`, `_should_exclude`, `PriorityMode`, `ExclusionMode`, independent scanner polling, duplicate-abort, hot config reload.
 
 ## 3. Open Questions / Decisions Pending
 
@@ -41,8 +43,8 @@ This living document is the **shared memory** between AI models, human developer
 2. **Serial I/O (Resolved in Phase 2 Spike):** Chose `serialport = { version = "4.7", default-features = false }` with a synchronous `Transport` trait (`&mut self`) running on a dedicated thread per scanner (`spawn_blocking` / worker thread).
    - *Rationale:* (a) `default-features = false` eliminates the `libudev` C dependency on Linux, allowing `aarch64-unknown-linux-gnu` cross-compilation from Windows/Ubuntu with zero C sysroot dependencies while still enumerating `/sys/class/tty` on Linux and Win32 SetupAPI on Windows; (b) synchronous `&mut self` avoids per-poll `Box<dyn Future>` heap allocations at 150 ms intervals and gives direct access to `write_request_to_send(true)`, `write_data_terminal_ready(true)`, `clear(ClearBuffer::Input)`, and `bytes_to_read()` for the 40ms/20ms pipelined batch drain.
 3. LAN/RTSP audio: parity scope or post-cutover?
-4. Poll-failure semantics: Python drops *both* scanners' results if either poll fails
-   (`engine/sync_manager.py:243-251`). Proposed: poll each scanner on its own in Rust.
+4. **Poll-failure semantics (Resolved for Phase 4):** Python drops *both* scanners' results if either poll fails
+   (`engine/sync_manager.py:243-251`). **Intentional Deviation Decided:** Rust polls each scanner independently in its own task/worker so a disconnected or unresponsive radio never stalls or drops telemetry/recordings from the healthy radio (`AGENTS.md` §2).
 5. Gemini's 3-phase split (2026-10-21) was reverted to P0–P7 with per-phase files (see log, 2026-10-22).
    Please confirm the user wants the one-file-per-phase layout to be permanent.
 
@@ -176,3 +178,27 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - On this Windows workstation, two MinGW packages exist under `%LOCALAPPDATA%\Microsoft\WinGet\Packages\`. Always prepend `C:\Users\MAC10\AppData\Local\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin` (which provides `libgcc_eh` + `dlltool.exe` required by the `stable-x86_64-pc-windows-gnu` toolchain when linking proc-macro DLLs) ahead of `MartinStorsjo.LLVM-MinGW.UCRT`.
 - **Next Tasks / Unfinished Work:** Begin Phase 3 — implement `sc-audio` per [`Plan/phase_3_audio_pipeline.md`](Plan/phase_3_audio_pipeline.md).
+
+### 2026-11-08 15:38 | Claude 3.7 Sonnet (Windows Dev Workstation)
+- **Phase:** Phase 3 — `sc-audio` (Real-Time Audio Pipeline, VOX, Loopback & Encoders) (Complete)
+- **Work Performed:**
+  - Implemented `sc-audio`:
+    - [`rust/crates/sc-audio/src/preroll.rs`](rust/crates/sc-audio/src/preroll.rs): `PreRollRingBuffer` (exact, sample-accurate circular buffer with chronological readout and zero chunk-rounding or off-by-one errors across wraps).
+    - [`rust/crates/sc-audio/src/vox.rs`](rust/crates/sc-audio/src/vox.rs): `compute_peak_equiv_rms` (`round(sqrt(mean(x^2) * 2.0))`), `rms_to_vox_meter` (`0..=90` dBFS scale), `ProScanVoxEngine` (20-minute history ring, `0.15s` VOX averaging window, 0-buffer attack, 2.0s hang time per `VOX-ALGORITHM.md` §1–4), and sample-accurate `VoxGate` verified sample-for-sample against `vox_test_16k.pcm` & `vox_expected.json` (`expected_gate_open_sample = 8000`, `expected_gate_close_sample = 28800`).
+    - [`rust/crates/sc-audio/src/resample.rs`](rust/crates/sc-audio/src/resample.rs): `resample_pcm_int16` (linear interpolation matching Python's `engine/sync_manager.py:resample_pcm_int16` against all 5 golden fixtures in `rust/fixtures/audio/resample/`), `resample_pcm_rubato` (band-limited FFT resampler via `rubato::FftFixedInOut`), and `resample_f32_linear`.
+    - [`rust/crates/sc-audio/src/loopback.rs`](rust/crates/sc-audio/src/loopback.rs): ProScan `scale_out_volume` (`PlaybackProcesser.cs:1119`) and `limit_short_1` (`Common_PS_RF.cs:254`), `AudioRingBuffer` (underrun zero-padding without permanent muting lockout), `LoopbackMixer` (`STEREO_SPLIT` / `CENTER`, 15 ms linear de-click gain ramping on mute/unmute/duck), and `fill_rt_output_callback` (real-time safe `rtrb` SPSC consumer + atomics).
+    - [`rust/crates/sc-audio/src/encoder.rs`](rust/crates/sc-audio/src/encoder.rs): `is_valid_mp3_payload` (MPEG Layer III consecutive frame sync check rejecting `0xFFFF` negative PCM and RIFF WAV), `encode_wav_with_metadata` (`hound` PCM validation + `sc_metadata::write_wav_riff_info`), `encode_mp3_raw_lame` (`mp3lame-encoder` matching `lameenc` 32/64/128 kbps curve, mono, quality 2), and `encode_audio_for_dispatch` (with WAV fallback per Prime Directive 1).
+    - [`rust/crates/sc-audio/src/devices.rs`](rust/crates/sc-audio/src/devices.rs): `list_audio_input_devices`, `list_audio_output_devices` matching `/api/audio/devices` and `/api/audio/output_devices`, and name-first `resolve_input_device` / `resolve_output_device`.
+    - [`rust/crates/sc-audio/src/stream.rs`](rust/crates/sc-audio/src/stream.rs): `push_rt_input_callback` (zero allocation, zero locks, zero logging, zero syscalls inside `cpal` callbacks), `ActiveCallSession`, `SingleScannerAudioStream`, and `ScannerAudioRecorder`.
+  - Updated [`.github/workflows/rust_ci.yml`](.github/workflows/rust_ci.yml) and added [`rust/tools/pkg-config-cross.bat`](rust/tools/pkg-config-cross.bat) for `alsa-sys` / `mp3lame-sys` cross-checking to `aarch64-unknown-linux-gnu`.
+- **Intentional Behaviour Deviations from Python:**
+  - `resolve_input_device` and `resolve_output_device` resolve by stored `device_name` first and fall back to `device_index` only for legacy `config.json` files (since `cpal` device indices differ from PortAudio indices).
+- **Live Capture Impact:** None. 2-hour hardware audio soak on Windows & Raspberry Pi is marked **not hardware-tested** until cutover testing.
+- **Verification Performed:**
+  - `cargo test --workspace`: 31 passed (`9` in `sc-audio`, `6` in `sc-core`, `5` in `sc-discovery`, `6` in `sc-drivers`, `5` in `sc-metadata` including 10,000 `proptest` cases).
+  - `cargo fmt --all -- --check`: clean (0 diffs).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+  - `cargo check --workspace --target aarch64-unknown-linux-gnu`: clean (3.18s).
+- **Gotchas / Warnings for Next Model:**
+  - When running `cargo check --workspace --target aarch64-unknown-linux-gnu` on Windows, set `$env:PKG_CONFIG_ALLOW_CROSS = "1"`, `$env:PKG_CONFIG = "A:\Scanscribe_Projects\Scanner_Controller\rust\tools\pkg-config-cross.bat"`, and `$env:DOCS_RS = "1"` so `alsa-sys` and `mp3lame-sys` skip host-specific build steps during type checking.
+- **Next Tasks / Unfinished Work:** Begin Phase 4 — implement `sc-feeder` and `sc-engine` per [`Plan/phase_4_engine_and_feeder.md`](Plan/phase_4_engine_and_feeder.md).

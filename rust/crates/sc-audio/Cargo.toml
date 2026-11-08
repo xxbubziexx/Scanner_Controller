@@ -1,0 +1,24 @@
+[package]
+name = "sc-audio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Real-time audio capture, PreRollRingBuffer, ProScan VOX, resampler, loopback mixer, and WAV/MP3 encoders"
+
+[lints]
+workspace = true
+
+[dependencies]
+sc-core = { path = "../sc-core" }
+sc-metadata = { path = "../sc-metadata" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+rtrb.workspace = true
+rubato.workspace = true
+hound.workspace = true
+cpal.workspace = true
+mp3lame-encoder.workspace = true

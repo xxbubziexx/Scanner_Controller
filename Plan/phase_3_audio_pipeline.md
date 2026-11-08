@@ -10,23 +10,23 @@
 Inside the `cpal` callback: no heap allocation, no `Mutex`/`RwLock`, no logging, no file/network/serial I/O, no blocking channel. Only lock-free SPSC (`rtrb`) and atomics. All other work runs on worker threads.
 
 ## 2. Capture & Devices
-- [ ] Enumeration matching the `/api/audio/devices` and `/api/audio/output_devices` JSON shapes.
-- [ ] cpal indices are **not** PortAudio indices. Resolve by stored device name (+ host API) and fall back to the index only for old configs.
-- [ ] `cpal` input stream → `rtrb` ring → per-scanner worker thread. Normalise `f32`/`i16` to signed 16-bit PCM.
+- [x] Enumeration matching the `/api/audio/devices` and `/api/audio/output_devices` JSON shapes.
+- [x] cpal indices are **not** PortAudio indices. Resolve by stored device name (+ host API) and fall back to the index only for old configs.
+- [x] `cpal` input stream → `rtrb` ring → per-scanner worker thread. Normalise `f32`/`i16` to signed 16-bit PCM.
 
 ## 3. Pre-Roll & VOX
-- [ ] `PreRollRingBuffer`: constant memory (0.5 s to 3.0 s), sample-accurate, chronological read-out on gate open.
-- [ ] VOX per `VOX-ALGORITHM.md` §1–4 (including its "Porting notes"): energy measurement, noise-floor history ring, threshold gate, attack/decay/hang.
-- [ ] Open/hang/close events match `vox_expected.json` sample for sample.
+- [x] `PreRollRingBuffer`: constant memory (0.5 s to 3.0 s), sample-accurate, chronological read-out on gate open.
+- [x] VOX per `VOX-ALGORITHM.md` §1–4 (including its "Porting notes"): energy measurement, noise-floor history ring, threshold gate, attack/decay/hang.
+- [x] Open/hang/close events match `vox_expected.json` sample for sample.
 
 ## 4. Resample & Mix
-- [ ] `rubato` replacing `resample_pcm_int16` (8 kHz to 48 kHz) within epsilon of the golden fixtures.
-- [ ] Loopback mixer: `STEREO_SPLIT` / `CENTER`, volume, 15 ms de-click gain ramps on duck/mute.
+- [x] `rubato` replacing `resample_pcm_int16` (8 kHz to 48 kHz) within epsilon of the golden fixtures.
+- [x] Loopback mixer: `STEREO_SPLIT` / `CENTER`, volume, 15 ms de-click gain ramps on duck/mute.
 
 ## 5. Encoders
-- [ ] WAV: PCM (`hound`) + hand-written chunks from `sc-metadata`.
-- [ ] MP3: `mp3lame-encoder` matching the Python `lameenc` bitrate/quality settings. (Cross-compile already proven in Phase 0.)
-- [ ] Output files parse with `sc-metadata`.
+- [x] WAV: PCM (`hound`) + hand-written chunks from `sc-metadata`.
+- [x] MP3: `mp3lame-encoder` matching the Python `lameenc` bitrate/quality settings. (Cross-compile already proven in Phase 0.)
+- [x] Output files parse with `sc-metadata`.
 
 ## 6. Optional / Post-Cutover
 - LAN audio (RTSP over TCP + RTP/µ-law over UDP). Only in scope if the Python build supports it today. Otherwise track as a post-cutover feature (see Open Decisions in the master plan).
