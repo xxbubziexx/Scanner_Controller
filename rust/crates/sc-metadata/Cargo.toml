@@ -13,6 +13,8 @@ workspace = true
 sc-core = { path = "../sc-core" }
 byteorder = { workspace = true }
 thiserror = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

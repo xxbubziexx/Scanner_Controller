@@ -10,6 +10,7 @@ import sys
 import json
 import shutil
 import datetime
+import dataclasses
 import struct
 import numpy as np
 
@@ -305,7 +306,7 @@ def generate_formatter_fixtures():
         })
 
     output = {
-        "metadata_snapshot": meta.to_dict(),
+        "metadata_snapshot": dataclasses.asdict(meta),
         "fixed_now": fixed_dt.isoformat(),
         "template_cases": cases,
         "sanitizer_cases": sanitizer_data

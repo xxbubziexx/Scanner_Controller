@@ -127,9 +127,9 @@ The phase sections below are summaries. The detailed checklists and exit gates l
 
 **Goal:** Freeze what "correct" means before touching Rust.
 
-- [ ] Tag the current Python state: `git tag python-baseline-v1`.
-- [ ] Get `python -m pytest tests/` green and record the pass count in `ACTIVE_CONTEXT.md`.
-- [ ] Write `tools/gen_fixtures.py`, which uses the **Python** modules to emit `rust/fixtures/`:
+- [x] Tag the current Python state: `git tag python-baseline-v1`.
+- [x] Get `python -m pytest tests/` green and record the pass count in `ACTIVE_CONTEXT.md`.
+- [x] Write `tools/gen_fixtures.py`, which uses the **Python** modules to emit `rust/fixtures/`:
   - `metadata/*.bin`: `build_pros_chunk`, `write_mp3_id3v23`, `write_wav_riff_info` output for a
     matrix of `ProScanMetadata` inputs (empty fields, max-length 253, non-ASCII, every template).
   - `formatters.json`: `{template, meta, expected}` for all 33 specifiers plus edge cases.
@@ -137,12 +137,12 @@ The phase sections below are summaries. The detailed checklists and exit gates l
     plus the parsed `ScannerStatus` JSON the Python driver produced.
   - `audio/*.pcm` + `vox_expected.json`: PCM input → VOX gate open/close sample indices.
   - `resample/*.pcm`: input/output pairs for 8k/16k/22.05k/44.1k/48k.
-- [ ] Copy the real ProScan sample recordings in the repo root (`*.wav`, `*.mp3`) into
+- [x] Copy the real ProScan sample recordings in the repo root (`*.wav`, `*.mp3`) into
   `rust/fixtures/proscan_samples/` as **parse** fixtures, i.e. third-party ground truth.
-- [ ] Scaffold the `rust/` workspace with shared `[workspace.lints]` (`clippy::unwrap_used = "deny"` etc.).
-- [ ] CI (GitHub Actions): `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` on
+- [x] Scaffold the `rust/` workspace with shared `[workspace.lints]` (`clippy::unwrap_used = "deny"` etc.).
+- [x] CI (GitHub Actions): `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` on
   `windows-latest` + `ubuntu-latest`; cross-check `aarch64-unknown-linux-gnu` build.
-- [ ] Write `AGENTS.md` + `ACTIVE_CONTEXT.md` (done with this plan).
+- [x] Write `AGENTS.md` + `ACTIVE_CONTEXT.md` (done with this plan).
 
 **Exit gate:** fixtures committed, CI green on an empty workspace, Python suite green.
 
@@ -152,20 +152,20 @@ The phase sections below are summaries. The detailed checklists and exit gates l
 
 **Goal:** Byte-exact metadata output. This is the module where mistakes hurt ScanScribe ingest the most.
 
-- [ ] `sc-core`: port every Pydantic model/enum (`ConnectionMode`, `ScannerModel` (34 variants),
+- [x] `sc-core`: port every Pydantic model/enum (`ConnectionMode`, `ScannerModel` (34 variants),
   `LockoutMethod`, `PriorityMode`, `ExclusionMode`, `AudioChannelMode`, `FeederMode`, `ScannerConfig`,
   `ScanScribeFeederConfig`, `SyncConfig`, `AudioLoopbackConfig`, `AppConfig`) with `serde`.
   - Must deserialize the **existing** `config.json` unchanged (same keys, `SCREAMING_CASE` enum strings,
     `null` device indices). Keep validators (`sample_rate`, `audio_format`, allowed baud rates per model).
   - `ScannerStatus` as a plain `Clone` struct (replaces `.clone()` / `.to_dict()`).
-- [ ] `sc-metadata`:
+- [x] `sc-metadata`:
   - `pros` chunk build + parse (`RECORDING-METADATA-FORMAT.md` §1), including length backpatch semantics.
   - ID3v2.3 writer: syncsafe ints, text frames (§2).
   - RIFF `LIST`/`INFO` writer (§3), append/re-tag behaviour (§4).
   - Template engine for all 33 `%` specifiers (§5, `FORMATTERS-AND-FILENAME-SCHEME.md`),
     `format_streaming_metadata`, `sanitize_filename`, `sanitize_folder_path`, `resolve_collision_filename`.
   - `clean_ascii_1` (max 253) as a dedicated, well-tested function.
-- [ ] Tests: every fixture from Phase 0 is checked with `assert_eq!(bytes, fixture)`. Add `proptest`
+- [x] Tests: every fixture from Phase 0 is checked with `assert_eq!(bytes, fixture)`. Add `proptest`
   round-trip (`build → parse == input`) and parse every real ProScan sample file.
 
 **Exit gate:** 100% fixture parity, zero `unwrap()` in non-test code, `cargo doc` builds.

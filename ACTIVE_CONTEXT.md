@@ -11,12 +11,12 @@ This living document is the **shared memory** between AI models, human developer
 
 ## 1. System Health & Current State
 
-- **Current Architecture Phase:** Phase 0 complete; entering **Phase 1: `sc-core` & `sc-metadata`**
-  (see [`Plan/phase_1_core_and_metadata.md`](Plan/phase_1_core_and_metadata.md)).
+- **Current Architecture Phase:** Phase 0 & Phase 1 complete; entering **Phase 2: `sc-drivers` & `sc-discovery`**
+  (see [`Plan/phase_2_drivers_and_discovery.md`](Plan/phase_2_drivers_and_discovery.md)).
 - **Production Stack:** Python (FastAPI `server.py` headless / CustomTkinter `gui.py`), commit `7ed6a22`.
 - **Python Test Baseline:** `59 passed in 1.55s` (`python -m pytest tests/`, Python 3.11.9, tagged `python-baseline-v1`).
 - **Rust Toolchain:** rustc/cargo 1.99.1 (`stable-x86_64-pc-windows-gnu` host, `aarch64-unknown-linux-gnu` target installed).
-- **Active Focus:** Phase 1 — `sc-core` (config & domain models) and `sc-metadata` (byte-exact ProScan codecs & 37 % formatters).
+- **Active Focus:** Phase 2 — `sc-drivers` (serial transport abstraction, DMA protocol codec, HomePatrol GSI/STS XML codec) and `sc-discovery`.
 
 ---
 
@@ -26,9 +26,12 @@ This living document is the **shared memory** between AI models, human developer
 - [x] Write `tools/gen_fixtures.py` and commit `rust/fixtures/` (metadata, formatters, drivers, audio, feeder, proscan samples).
 - [x] Scaffold `rust/` workspace with shared lints (`unwrap_used = "deny"`, clippy priority) + CI (`.github/workflows/rust_ci.yml`).
 - [x] Target check: verified `aarch64-unknown-linux-gnu` cross-compilation passes cleanly.
-- [ ] Implement `sc-core`: `ScannerModel` (34 models), `AppConfig`, `ScannerConfig`, `ScannerStatus`, deserialize `config.json`.
-- [ ] Implement `sc-metadata`: `build_pros_chunk`, `parse_pros_chunk`, ID3v2.3 tag writer, RIFF `LIST`/`INFO`, 37 `%` formatters.
-- [ ] Verify 100% byte parity against `rust/fixtures/metadata/*.bin` and `rust/fixtures/formatters.json`.
+- [x] Implement `sc-core`: `ScannerModel` (34 models), `AppConfig`, `ScannerConfig`, `ScannerStatus`, deserialize `config.json`.
+- [x] Implement `sc-metadata`: `build_pros_chunk`, `parse_pros_chunk`, ID3v2.3 tag writer, RIFF `LIST`/`INFO`, 37 `%` formatters.
+- [x] Verify 100% byte parity against `rust/fixtures/metadata/*.bin` and `rust/fixtures/formatters.json`.
+- [x] Add property-based testing (`proptest`) for `pros` chunk roundtrip (10,000 cases passed).
+- [ ] Implement `sc-drivers`: `Transport` trait, DMA parser/formatter, HomePatrol parser/formatter (`quick-xml`).
+- [ ] Implement `sc-discovery`: serial COM port scanner and LAN UDP detector.
 
 ## 3. Open Questions / Decisions Pending
 
@@ -111,3 +114,32 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - Workspace target directory is git-ignored via `rust/.gitignore`.
 - **Next Tasks / Unfinished Work:** Begin Phase 1 Step 1 — implement `sc-core` domain models and serialize/deserialize against `config.json`.
+
+### 2026-11-08 14:35 | Claude 3.7 Sonnet (Windows Dev Workstation)
+- **Phase:** Phase 1 — `sc-core` & `sc-metadata` (Complete)
+- **Work Performed:**
+  - Implemented `sc-core`:
+    - [`rust/crates/sc-core/src/enums.rs`](rust/crates/sc-core/src/enums.rs): 34 `ScannerModel` variants, `ConnectionMode`, `LockoutMethod`, `PriorityMode`, `ExclusionMode`, `AudioChannelMode`, `FeederMode`, model-specific baud rate validator, `ALLOWED_SAMPLE_RATES`.
+    - [`rust/crates/sc-core/src/status.rs`](rust/crates/sc-core/src/status.rs): `ScannerStatus` struct and `normalize_frequency` (ported from `drivers/base_driver.py`).
+    - [`rust/crates/sc-core/src/config.rs`](rust/crates/sc-core/src/config.rs): `ScannerConfig`, `ScanScribeFeederConfig`, `SyncConfig`, `AudioLoopbackConfig`, `AppConfig` with serde JSON serializers and validators.
+    - Verified loading and roundtripping the real production `config.json`.
+  - Implemented `sc-metadata`:
+    - [`rust/crates/sc-metadata/src/record.rs`](rust/crates/sc-metadata/src/record.rs): `ProScanMetadata` with all 22 fields + serde aliases.
+    - [`rust/crates/sc-metadata/src/clean.rs`](rust/crates/sc-metadata/src/clean.rs): `clean_ascii_1` (ProScan printable ASCII filter & max 253 truncation).
+    - [`rust/crates/sc-metadata/src/pros.rs`](rust/crates/sc-metadata/src/pros.rs): `build_pros_chunk` & `parse_pros_chunk` (spec §1 exact 22-item run, length backpatching, fixed padding, odd-length pad byte). Added `sanitize_field` for robust ASCII sanitization.
+    - [`rust/crates/sc-metadata/src/id3.rs`](rust/crates/sc-metadata/src/id3.rs): `encode_syncsafe`, `build_id3v23_text_frame`, `write_mp3_id3v23` (spec §2 ID3v2.3 writer with template gating).
+    - [`rust/crates/sc-metadata/src/riff.rs`](rust/crates/sc-metadata/src/riff.rs): `build_riff_info_subchunk`, `write_wav_riff_info` (spec §3-4 RIFF LIST/INFO + pros chunk).
+    - [`rust/crates/sc-metadata/src/formatters.rs`](rust/crates/sc-metadata/src/formatters.rs): `format_template` (37 formatters in exact `General.cs:33805` order), `format_streaming_metadata` (Engine B), `sanitize_filename`, `sanitize_folder_path`.
+  - Added property-based testing (`proptest`) running 10,000 cases of roundtrip build/parse on `pros` chunk.
+  - Added comprehensive test asserting byte-for-byte exact equality on all 23 binary metadata fixtures in `rust/fixtures/metadata/`.
+- **Intentional Behaviour Deviations from Python:** None. Byte-for-byte exact compatibility maintained across all 23 binary fixtures and 45 template test cases.
+- **Live Capture Impact:** None.
+- **Verification Performed:**
+  - `cargo test --workspace`: all 11 tests passing (6 in `sc-core`, 5 in `sc-metadata` including 10,000 proptest cases).
+  - `cargo fmt --all -- --check`: clean (0 diffs).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings, clean.
+  - `cargo doc --workspace --no-deps`: built cleanly.
+  - `cargo check --workspace --target aarch64-unknown-linux-gnu`: clean (ARM64 cross-compile OK).
+- **Gotchas / Warnings for Next Model:**
+  - When running `cargo` in PowerShell sessions on this dev machine, ensure `$env:PATH` contains `$env:USERPROFILE\.cargo\bin` and the LLVM MinGW directory (`C:\Users\MAC10\AppData\Local\Microsoft\WinGet\Packages\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\llvm-mingw-20250114-ucrt-x86_64\bin`).
+- **Next Tasks / Unfinished Work:** Begin Phase 2 — implement `sc-drivers` and `sc-discovery` per [`Plan/phase_2_drivers_and_discovery.md`](Plan/phase_2_drivers_and_discovery.md).
