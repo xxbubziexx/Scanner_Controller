@@ -11,20 +11,24 @@ This living document is the **shared memory** between AI models, human developer
 
 ## 1. System Health & Current State
 
-- **Current Architecture Phase:** Python → Rust migration **planned**, Phase 0 baseline verified
-  (see [`Plan/rust_conversion_master_plan.md`](Plan/rust_conversion_master_plan.md)).
+- **Current Architecture Phase:** Phase 0 complete; entering **Phase 1: `sc-core` & `sc-metadata`**
+  (see [`Plan/phase_1_core_and_metadata.md`](Plan/phase_1_core_and_metadata.md)).
 - **Production Stack:** Python (FastAPI `server.py` headless / CustomTkinter `gui.py`), commit `7ed6a22`.
-- **Python Test Baseline:** `59 passed in 1.44s` (`python -m pytest tests/`, Python 3.11.9).
-- **Active Focus:** Phase 0: baseline tag, golden fixture generator, Rust workspace scaffold, CI.
+- **Python Test Baseline:** `59 passed in 1.55s` (`python -m pytest tests/`, Python 3.11.9, tagged `python-baseline-v1`).
+- **Rust Toolchain:** rustc/cargo 1.99.1 (`stable-x86_64-pc-windows-gnu` host, `aarch64-unknown-linux-gnu` target installed).
+- **Active Focus:** Phase 1 — `sc-core` (config & domain models) and `sc-metadata` (byte-exact ProScan codecs & 37 % formatters).
 
 ---
 
 ## 2. In-Progress Features & Next Objectives
 
-- [ ] Tag `python-baseline-v1` and record the pytest pass count above.
-- [ ] Write `tools/gen_fixtures.py` and commit `rust/fixtures/`.
-- [ ] Scaffold `rust/` workspace with shared lints + CI (Windows, Ubuntu, aarch64 check).
-- [ ] Spike: `mp3lame-encoder` cross-compile for `aarch64-unknown-linux-gnu`.
+- [x] Tag `python-baseline-v1` on commit `7ed6a22` (59 passed in 1.55s).
+- [x] Write `tools/gen_fixtures.py` and commit `rust/fixtures/` (metadata, formatters, drivers, audio, feeder, proscan samples).
+- [x] Scaffold `rust/` workspace with shared lints (`unwrap_used = "deny"`, clippy priority) + CI (`.github/workflows/rust_ci.yml`).
+- [x] Target check: verified `aarch64-unknown-linux-gnu` cross-compilation passes cleanly.
+- [ ] Implement `sc-core`: `ScannerModel` (34 models), `AppConfig`, `ScannerConfig`, `ScannerStatus`, deserialize `config.json`.
+- [ ] Implement `sc-metadata`: `build_pros_chunk`, `parse_pros_chunk`, ID3v2.3 tag writer, RIFF `LIST`/`INFO`, 37 `%` formatters.
+- [ ] Verify 100% byte parity against `rust/fixtures/metadata/*.bin` and `rust/fixtures/formatters.json`.
 
 ## 3. Open Questions / Decisions Pending
 
@@ -85,3 +89,25 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - Phase 5's route list is copied from the master plan; grep could not extract routes from `server.py`. Diff against the real file first.
 - **Next Tasks / Unfinished Work:** Install Rust toolchain; begin Phase 0.
+
+### 2026-11-08 14:00 | Gemini 3.8 Flash (Windows Dev Workstation)
+- **Phase:** Phase 0 (Baseline, Fixtures & Scaffolding) -> Phase 1 Entry
+- **Work Performed:**
+  - Verified Python test suite baseline: `59 passed in 1.55s` on Python 3.11.9.
+  - Tagged `python-baseline-v1` on git commit `7ed6a22`.
+  - Installed Rust toolchain (rustc/cargo 1.99.1, `stable-x86_64-pc-windows-gnu` host, `aarch64-unknown-linux-gnu` target).
+  - Implemented `tools/gen_fixtures.py` and generated golden test vectors in `rust/fixtures/` (23 metadata binary blobs, formatters.json matrix with 45 cases, 5 driver transcripts, audio & VOX fixtures, feeder schemas, and 5 ProScan sample files).
+  - Scaffolded Cargo workspace `rust/` with `sc-core`, `sc-metadata`, and `xtask`. Configured workspace lints with strict clippy priorities and `unwrap_used = "deny"`.
+  - Created `.github/workflows/rust_ci.yml` verifying formatting, clippy, and compilation on Windows, Ubuntu, and ARM64 Pi target.
+  - Verified `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo check --target aarch64-unknown-linux-gnu` all pass with zero warnings.
+- **Intentional Behaviour Deviations from Python:** None.
+- **Live Capture Impact:** None.
+- **Verification Performed:**
+  - `python -m pytest tests/`: 59 passed in 1.55s.
+  - `python tools/gen_fixtures.py`: all fixtures written cleanly.
+  - `cargo fmt --all -- --check`: 0 diffs.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+  - `cargo check --workspace --target aarch64-unknown-linux-gnu`: passed cleanly.
+- **Gotchas / Warnings for Next Model:**
+  - Workspace target directory is git-ignored via `rust/.gitignore`.
+- **Next Tasks / Unfinished Work:** Begin Phase 1 Step 1 — implement `sc-core` domain models and serialize/deserialize against `config.json`.
