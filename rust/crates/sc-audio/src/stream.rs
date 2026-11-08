@@ -272,7 +272,6 @@ pub struct SingleScannerAudioStream {
     live_level_pct: Arc<AtomicU8>,
     xrun_count: Arc<AtomicU64>,
     running: Arc<AtomicBool>,
-    cpal_stream: Option<cpal::Stream>,
     worker_handle: Option<JoinHandle<()>>,
 }
 
@@ -317,7 +316,6 @@ impl SingleScannerAudioStream {
             live_level_pct: Arc::new(AtomicU8::new(0)),
             xrun_count: Arc::new(AtomicU64::new(0)),
             running: Arc::new(AtomicBool::new(false)),
-            cpal_stream: None,
             worker_handle: None,
         }
     }
@@ -431,97 +429,84 @@ impl SingleScannerAudioStream {
         let err_xrun = Arc::clone(&self.xrun_count);
         let ch_mode = self.channel_mode;
         let ch_usize = usize::from(hw_channels);
+        let dev_name = self.device_name.clone();
+        let dev_idx = self.device_index;
 
-        let stream_cfg = StreamConfig {
-            channels: hw_channels,
-            sample_rate: cpal::SampleRate(hw_rate),
-            buffer_size: cpal::BufferSize::Default,
-        };
-
-        let stream_res = match sample_format {
-            SampleFormat::F32 => device.build_input_stream(
-                &stream_cfg,
-                move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                    push_rt_input_callback(
-                        data,
-                        ch_usize,
-                        ch_mode,
-                        &mut producer,
-                        &level_cb,
-                        &xrun_cb,
-                    );
-                },
-                move |_err| {
-                    err_xrun.fetch_add(1, Ordering::Relaxed);
-                },
-                None,
-            ),
-            SampleFormat::I16 => {
-                let mut f32_scratch = [0.0_f32; 4096];
-                device.build_input_stream(
-                    &stream_cfg,
-                    move |data: &[i16], _: &cpal::InputCallbackInfo| {
-                        for chunk in data.chunks(f32_scratch.len()) {
-                            for (dst, &src) in f32_scratch.iter_mut().zip(chunk.iter()) {
-                                *dst = f32::from(src) / 32768.0;
-                            }
-                            push_rt_input_callback(
-                                &f32_scratch[..chunk.len()],
-                                ch_usize,
-                                ch_mode,
-                                &mut producer,
-                                &level_cb,
-                                &xrun_cb,
-                            );
-                        }
-                    },
-                    move |_err| {
-                        err_xrun.fetch_add(1, Ordering::Relaxed);
-                    },
-                    None,
-                )
-            }
-            _ => {
-                running_flag.store(false, Ordering::SeqCst);
-                tracing::warn!(
-                    scanner_id = %self.scanner_id,
-                    ?sample_format,
-                    "Unsupported cpal sample format"
-                );
-                return;
-            }
-        };
-
-        let stream = match stream_res {
-            Ok(s) => s,
-            Err(err) => {
-                running_flag.store(false, Ordering::SeqCst);
-                tracing::warn!(
-                    scanner_id = %self.scanner_id,
-                    error = %err,
-                    "Failed to build cpal input stream"
-                );
-                return;
-            }
-        };
-
-        if let Err(err) = stream.play() {
-            running_flag.store(false, Ordering::SeqCst);
-            tracing::warn!(
-                scanner_id = %self.scanner_id,
-                error = %err,
-                "Failed to start cpal input stream"
-            );
-            return;
-        }
-
-        // Spawn dedicated worker thread to drain the SPSC ring (no locks in callback!)
+        // Spawn dedicated worker thread to own the cpal::Stream (!Send on WASAPI) and drain the SPSC ring
         let worker_running = Arc::clone(&self.running);
         let worker_state = Arc::clone(&self.state);
         let scanner_id_clone = self.scanner_id.clone();
         let handle = thread::Builder::new()
             .name(format!("sc-audio-{}", self.scanner_id))
             .spawn(move || {
+                let Some(thread_dev) = resolve_input_device(dev_name.as_deref(), dev_idx) else {
+                    worker_running.store(false, Ordering::SeqCst);
+                    return;
+                };
+                let stream_cfg = StreamConfig {
+                    channels: hw_channels,
+                    sample_rate: cpal::SampleRate(hw_rate),
+                    buffer_size: cpal::BufferSize::Default,
+                };
+                let stream_res = match sample_format {
+                    SampleFormat::F32 => thread_dev.build_input_stream(
+                        &stream_cfg,
+                        move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                            push_rt_input_callback(
+                                data,
+                                ch_usize,
+                                ch_mode,
+                                &mut producer,
+                                &level_cb,
+                                &xrun_cb,
+                            );
+                        },
+                        move |_err| {
+                            err_xrun.fetch_add(1, Ordering::Relaxed);
+                        },
+                        None,
+                    ),
+                    SampleFormat::I16 => {
+                        let mut f32_scratch = [0.0_f32; 4096];
+                        thread_dev.build_input_stream(
+                            &stream_cfg,
+                            move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                                for chunk in data.chunks(f32_scratch.len()) {
+                                    for (dst, &src) in f32_scratch.iter_mut().zip(chunk.iter()) {
+                                        *dst = f32::from(src) / 32768.0;
+                                    }
+                                    push_rt_input_callback(
+                                        &f32_scratch[..chunk.len()],
+                                        ch_usize,
+                                        ch_mode,
+                                        &mut producer,
+                                        &level_cb,
+                                        &xrun_cb,
+                                    );
+                                }
+                            },
+                            move |_err| {
+                                err_xrun.fetch_add(1, Ordering::Relaxed);
+                            },
+                            None,
+                        )
+                    }
+                    _ => {
+                        worker_running.store(false, Ordering::SeqCst);
+                        return;
+                    }
+                };
+
+                let Ok(stream) = stream_res else {
+                    worker_running.store(false, Ordering::SeqCst);
+                    return;
+                };
+                if stream.play().is_err() {
+                    worker_running.store(false, Ordering::SeqCst);
+                    return;
+                }
+                let _stream_guard = stream;
+
                 let mut f32_batch = Vec::with_capacity(1024);
                 let mut i16_batch = Vec::with_capacity(1024);
                 let mut pcm_bytes = Vec::with_capacity(2048);
@@ -572,7 +557,6 @@ impl SingleScannerAudioStream {
 
         if let Ok(h) = handle {
             self.worker_handle = Some(h);
-            self.cpal_stream = Some(stream);
             tracing::info!(
                 scanner_id = %self.scanner_id,
                 sample_rate = hw_rate,
@@ -587,7 +571,6 @@ impl SingleScannerAudioStream {
     /// Stops the hardware stream and joins the worker thread cleanly.
     pub fn stop(&mut self) {
         self.running.store(false, Ordering::SeqCst);
-        self.cpal_stream = None;
         if let Some(handle) = self.worker_handle.take() {
             // Worker exits within 5ms once running is false
             let _ = handle.join();
@@ -733,7 +716,8 @@ pub struct ScannerAudioRecorder {
     pub loopback_mixer: Arc<Mutex<LoopbackMixer>>,
     output_device_index: Option<u32>,
     output_device_name: Option<String>,
-    output_stream: Option<cpal::Stream>,
+    output_running: Arc<AtomicBool>,
+    output_handle: Option<JoinHandle<()>>,
     rt_loopback_shared: Arc<RtLoopbackShared>,
     pub recording_enabled: bool,
     running: bool,
@@ -770,7 +754,8 @@ impl ScannerAudioRecorder {
             ))),
             output_device_index: loopback_output_device,
             output_device_name: loopback_output_name,
-            output_stream: None,
+            output_running: Arc::new(AtomicBool::new(false)),
+            output_handle: None,
             rt_loopback_shared: RtLoopbackShared::new(pan, 2048),
             recording_enabled: true,
             running: false,
@@ -864,29 +849,53 @@ impl ScannerAudioRecorder {
                         mixer.samplerate = out_rate;
                     }
                     let shared = Arc::clone(&self.rt_loopback_shared);
-                    let cfg = StreamConfig {
-                        channels: out_ch,
-                        sample_rate: cpal::SampleRate(out_rate),
-                        buffer_size: cpal::BufferSize::Default,
-                    };
-                    let ch_usize = usize::from(out_ch);
-                    if let Ok(stream) = out_dev.build_output_stream(
-                        &cfg,
-                        move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                            fill_rt_output_callback(
-                                data,
-                                ch_usize,
-                                &mut cons_a,
-                                &mut cons_b,
-                                &shared,
-                            );
-                        },
-                        move |_err| {},
-                        None,
-                    ) {
-                        if stream.play().is_ok() {
-                            self.output_stream = Some(stream);
-                        }
+                    let out_name = self.output_device_name.clone();
+                    let out_idx = self.output_device_index;
+                    let out_run = Arc::clone(&self.output_running);
+                    out_run.store(true, Ordering::SeqCst);
+
+                    if let Ok(h) = thread::Builder::new()
+                        .name("sc-audio-loopback".to_string())
+                        .spawn(move || {
+                            let Some(thread_out_dev) =
+                                resolve_output_device(out_name.as_deref(), out_idx)
+                            else {
+                                out_run.store(false, Ordering::SeqCst);
+                                return;
+                            };
+                            let cfg = StreamConfig {
+                                channels: out_ch,
+                                sample_rate: cpal::SampleRate(out_rate),
+                                buffer_size: cpal::BufferSize::Default,
+                            };
+                            let ch_usize = usize::from(out_ch);
+                            if let Ok(stream) = thread_out_dev.build_output_stream(
+                                &cfg,
+                                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                                    fill_rt_output_callback(
+                                        data,
+                                        ch_usize,
+                                        &mut cons_a,
+                                        &mut cons_b,
+                                        &shared,
+                                    );
+                                },
+                                move |_err| {},
+                                None,
+                            ) {
+                                if stream.play().is_ok() {
+                                    let _stream_guard = stream;
+                                    while out_run.load(Ordering::Relaxed) {
+                                        thread::sleep(Duration::from_millis(10));
+                                    }
+                                }
+                            }
+                            out_run.store(false, Ordering::SeqCst);
+                        })
+                    {
+                        self.output_handle = Some(h);
+                    } else {
+                        self.output_running.store(false, Ordering::SeqCst);
                     }
                 }
             }
@@ -907,10 +916,13 @@ impl ScannerAudioRecorder {
     /// Stops all capture and playback streams cleanly.
     pub fn stop(&mut self) {
         self.running = false;
+        self.output_running.store(false, Ordering::SeqCst);
+        if let Some(h) = self.output_handle.take() {
+            let _ = h.join();
+        }
         for stream in self.streams.values_mut() {
             stream.stop();
         }
-        self.output_stream = None;
     }
 
     /// Notifies `scanner_id` that squelch opened with `status_snapshot`.

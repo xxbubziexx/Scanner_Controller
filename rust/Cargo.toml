@@ -6,6 +6,8 @@ members = [
     "crates/sc-drivers",
     "crates/sc-discovery",
     "crates/sc-audio",
+    "crates/sc-feeder",
+    "crates/sc-engine",
     "bins/scanner-controller",
     "xtask",
 ]
@@ -45,5 +47,8 @@ rtrb = "0.3"
 rubato = "0.16"
 hound = "3.5"
 mp3lame-encoder = "0.2"
+tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "sync", "time", "net", "signal"] }
+tokio-util = "0.7"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart"] }
 
 

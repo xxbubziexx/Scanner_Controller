@@ -1,0 +1,26 @@
+[package]
+name = "sc-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Dual-scanner mutual exclusion engine, independent scanner polling, and async ScanScribe dispatch pool"
+
+[lints]
+workspace = true
+
+[dependencies]
+sc-core = { path = "../sc-core" }
+sc-metadata = { path = "../sc-metadata" }
+sc-drivers = { path = "../sc-drivers" }
+sc-audio = { path = "../sc-audio" }
+sc-feeder = { path = "../sc-feeder" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+

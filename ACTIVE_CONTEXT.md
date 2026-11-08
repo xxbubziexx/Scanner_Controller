@@ -11,12 +11,12 @@ This living document is the **shared memory** between AI models, human developer
 
 ## 1. System Health & Current State
 
-- **Current Architecture Phase:** Phase 0, Phase 1, Phase 2 & Phase 3 complete; entering **Phase 4: `sc-engine` & `sc-feeder`**
-  (see [`Plan/phase_4_engine_and_feeder.md`](Plan/phase_4_engine_and_feeder.md)).
+- **Current Architecture Phase:** Phase 0, Phase 1, Phase 2, Phase 3 & Phase 4 complete; entering **Phase 5: `sc-server` & Headless Daemon**
+  (see [`Plan/phase_5_server_and_shadow_run.md`](Plan/phase_5_server_and_shadow_run.md)).
 - **Production Stack:** Python (FastAPI `server.py` headless / CustomTkinter `gui.py`), commit `7ed6a22`.
 - **Python Test Baseline:** `59 passed in 1.16s` (`python -m pytest tests/`, Python 3.11.9, tagged `python-baseline-v1`).
 - **Rust Toolchain:** rustc/cargo 1.99.1 (`stable-x86_64-pc-windows-gnu` host, `aarch64-unknown-linux-gnu` target installed).
-- **Active Focus:** Phase 4 — `sc-engine` (`SyncManager` actor, mutual exclusion state machine, independent per-scanner polling) and `sc-feeder` (atomic `DIRECTORY_DROP` + `reqwest` multipart webhook + fallback inbox).
+- **Active Focus:** Phase 5 — `sc-server` (Axum HTTP REST + WebSocket `/ws` server + embedded `static/` UI) and `scanner-controller serve`.
 
 ---
 
@@ -34,8 +34,10 @@ This living document is the **shared memory** between AI models, human developer
 - [x] Implement `sc-discovery`: serial COM port scanner (with `active_ports` guard and VID/PID metadata) and LAN UDP detector (`SUS\r` on UDP 50536).
 - [x] Implement `scanner-controller` CLI binary with `detect` and `probe-keypad` subcommands.
 - [x] Implement `sc-audio`: `PreRollRingBuffer`, `VoxGate` + `ProScanVoxEngine`, de-click ramps (`LoopbackMixer`), resamplers (`resample_pcm_int16` & `rubato`), `cpal` + `rtrb` capture/loopback, WAV (`hound` + `sc-metadata`) and MP3 (`mp3lame-encoder` + `sc-metadata`) encoders.
-- [ ] Implement `sc-feeder`: `CallTransmissionPayload`, `ScanScribeFeeder` (atomic `DIRECTORY_DROP`, `HTTP_WEBHOOK`, sidecar JSON, fallback inbox).
-- [ ] Implement `sc-engine`: `SyncManager`, `_should_exclude`, `PriorityMode`, `ExclusionMode`, independent scanner polling, duplicate-abort, hot config reload.
+- [x] Implement `sc-feeder`: `CallTransmissionPayload`, `ScanScribeFeeder` (atomic `DIRECTORY_DROP`, `HTTP_WEBHOOK`, sidecar JSON, fallback inbox).
+- [x] Implement `sc-engine`: `SyncManager`, `_should_exclude`, `PriorityMode`, `ExclusionMode`, independent scanner polling, duplicate-abort, hot config reload.
+- [ ] Implement `sc-server`: Axum REST & WebSocket server, `rust-embed` static files, contract tests against `server.py`.
+- [ ] Implement `sc-desktop` & Phase 7 packaging (`install.sh`, `Dockerfile`, release binary).
 
 ## 3. Open Questions / Decisions Pending
 
@@ -202,3 +204,25 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - When running `cargo check --workspace --target aarch64-unknown-linux-gnu` on Windows, set `$env:PKG_CONFIG_ALLOW_CROSS = "1"`, `$env:PKG_CONFIG = "A:\Scanscribe_Projects\Scanner_Controller\rust\tools\pkg-config-cross.bat"`, and `$env:DOCS_RS = "1"` so `alsa-sys` and `mp3lame-sys` skip host-specific build steps during type checking.
 - **Next Tasks / Unfinished Work:** Begin Phase 4 — implement `sc-feeder` and `sc-engine` per [`Plan/phase_4_engine_and_feeder.md`](Plan/phase_4_engine_and_feeder.md).
+
+### 2026-11-08 16:03 | Claude Opus 4.6 (Windows Dev Workstation)
+- **Phase:** Phase 4 — `sc-feeder` & `sc-engine`
+- **Work Performed:**
+  - Implemented [`rust/crates/sc-feeder`](rust/crates/sc-feeder/src/lib.rs):
+    - `CallTransmissionPayload`, `SidecarMetadata`, `ProScanMetadataDict` (exact 22-field PascalCase `ProScanMetadata.to_dict()` mapping), `DispatchResult`.
+    - `ScanScribeFeeder`: per-scanner `filename_template` & `tit2_template` resolution, atomic temp-file + rename `DIRECTORY_DROP`, `reqwest` multipart `HTTP_WEBHOOK` with retry, and automatic fallback inbox archival (`./recordings`) on primary inbox or webhook failure (Prime Directive 1: "Never lose a call").
+  - Implemented [`rust/crates/sc-engine`](rust/crates/sc-engine/src/lib.rs):
+    - `should_exclude` (`TGID_ONLY`, `FREQ_ONLY`, `TGID_AND_FREQ` with `< 0.001` MHz tolerance), `ExclusionStateMachine` (`EqualPeers`, `PrimarySecondary`, `DepartmentPriority`, `active_exclusions` with `hang_time_seconds` and `auto_release_seconds`, event log capped at 100).
+    - `SyncManager<T>`: independent per-scanner polling tasks, duplicate-abort of secondary recordings before save/dispatch, `watch::Receiver<EngineStateSnapshot>` state channel, bounded dispatch worker pool with `CancellationToken` drain on shutdown, and hot `update_config` reload without restarting audio streams unless devices changed.
+  - Updated [`rust/crates/sc-audio/src/stream.rs`](rust/crates/sc-audio/src/stream.rs) so `cpal::Stream` (`!Send` on Windows WASAPI) is created and held inside the dedicated `sc-audio-*` worker threads, making `SingleScannerAudioStream`, `ScannerAudioRecorder`, and `SyncManager` naturally `Send + Sync` with zero `unsafe`.
+- **Intentional Behaviour Deviations from Python:**
+  - Recorded in §3.4: `SyncManager` polls `scanner_a` and `scanner_b` independently rather than using `asyncio.gather` (`engine/sync_manager.py:243-251`), so one disconnected or failing scanner never stalls or drops recordings from the healthy scanner.
+- **Live Capture Impact:** None (not hardware-tested; tested against `ReplayTransport` and synthetic PCM).
+- **Verification Performed:**
+  - `cargo fmt --all -- --check`: passed.
+  - `cargo test --workspace`: 37 passed (`3` in `sc-feeder`, `3` in `sc-engine`, `9` in `sc-audio`, `6` in `sc-drivers`, `5` in `sc-discovery`, `5` in `sc-metadata`, `6` in `sc-core`).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+  - `cargo check --workspace --target aarch64-unknown-linux-gnu`: clean (19.69s).
+- **Gotchas / Warnings for Next Model:**
+  - `ProScanMetadataDict` in `sc-feeder` preserves the exact 22 PascalCase keys of Python's `ProScanMetadata.to_dict()` (`"Scanner"`, `"EndingDate"`, ..., `"UID#"`, ..., `"ScannerMode"`).
+- **Next Tasks / Unfinished Work:** Begin Phase 5 — implement `sc-server` (Axum HTTP REST + WebSocket `/ws` + embedded `static/` UI) and wire `serve` subcommand into `scanner-controller`.

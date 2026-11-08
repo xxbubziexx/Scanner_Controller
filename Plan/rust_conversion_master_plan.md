@@ -223,20 +223,20 @@ loopback audibly click-free, MP3/WAV outputs pass `sc-metadata` parse + play in 
 
 **Goal:** Mutual exclusion and dispatch, with the same behaviour as Python and fixes for known weak spots.
 
-- [ ] `SyncManager` as a tokio actor: owns drivers, receives `ScannerStatus` updates via channels,
+- [x] `SyncManager` as a tokio actor: owns drivers, receives `ScannerStatus` updates via channels,
   exposes state through a `watch` channel (feeds `/api/state` + `/ws`).
-- [ ] Port `_should_exclude` (TGID / FREQ / both, `< 0.001` MHz tolerance), `active_exclusions` with
+- [x] Port `_should_exclude` (TGID / FREQ / both, `< 0.001` MHz tolerance), `active_exclusions` with
   `release_at`, `hang_time_seconds`, `auto_release_seconds`, `PriorityMode` (`EQUAL_PEERS` / primary),
   event log capped at 100.
-- [ ] **Behaviour fix to decide on purpose:** Python polls A and B with `asyncio.gather` and drops *both*
+- [x] **Behaviour fix to decide on purpose:** Python polls A and B with `asyncio.gather` and drops *both*
   results if either fails (`sync_manager.py:243-251`). Rust should poll each scanner on its own so one
   dead radio never stalls the other. Record the decision in `ACTIVE_CONTEXT.md`.
-- [ ] Duplicate-abort: cancel the secondary recording **before** it is saved/dispatched.
-- [ ] Dispatch worker pool (replaces `ThreadPoolExecutor`) built on `spawn_blocking` / bounded channel
+- [x] Duplicate-abort: cancel the secondary recording **before** it is saved/dispatched.
+- [x] Dispatch worker pool (replaces `ThreadPoolExecutor`) built on `spawn_blocking` / bounded channel
   with back-pressure. Never drop a completed call silently.
-- [ ] `sc-feeder`: `DIRECTORY_DROP` (atomic write: temp file + rename into inbox), webhook POST
+- [x] `sc-feeder`: `DIRECTORY_DROP` (atomic write: temp file + rename into inbox), webhook POST
   (`CallTransmissionPayload` JSON shape unchanged), `is_valid_mp3_payload`, sidecar `.json`, fallback paths.
-- [ ] Hot config reload (`update_config`) without restarting audio streams unless devices changed.
+- [x] Hot config reload (`update_config`) without restarting audio streams unless devices changed.
 
 **Exit gate:** simulated two-scanner tests (ReplayTransport + synthetic PCM) cover every exclusion mode;
 feeder output is byte-identical to Python for the same inputs.
