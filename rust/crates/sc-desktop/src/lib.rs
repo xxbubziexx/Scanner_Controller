@@ -140,20 +140,27 @@ impl Default for DesktopShellConfig {
 pub fn launch_native_app_window(url: &str) {
     #[cfg(target_os = "windows")]
     {
-        // Try Microsoft Edge in native chromeless app mode first
-        let edge_launched = std::process::Command::new("cmd")
-            .args([
-                "/C",
-                "start",
-                "",
-                "msedge",
-                &format!("--app={url}"),
-                "--window-size=1460,940",
-            ])
-            .spawn()
-            .is_ok();
+        let candidate_paths = [
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        ];
 
-        if !edge_launched {
+        let mut app_window_launched = false;
+        for bin in candidate_paths {
+            if std::path::Path::new(bin).exists()
+                && std::process::Command::new(bin)
+                    .args([&format!("--app={url}"), "--window-size=1460,940"])
+                    .spawn()
+                    .is_ok()
+            {
+                app_window_launched = true;
+                break;
+            }
+        }
+
+        if !app_window_launched {
             let _ = std::process::Command::new("cmd")
                 .args(["/C", "start", "", url])
                 .spawn();

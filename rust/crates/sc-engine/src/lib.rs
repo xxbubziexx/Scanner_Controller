@@ -568,7 +568,7 @@ impl<T: Transport + 'static> SyncManager<T> {
             }
         });
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_possible_truncation, clippy::unnecessary_cast)]
         let mut recorder = ScannerAudioRecorder::new(
             config.feeder.sample_rate,
             config.sync.hang_time_seconds,
@@ -632,7 +632,7 @@ impl<T: Transport + 'static> SyncManager<T> {
         );
         recorder.mute_scanner("scanner_b", !enabled_b);
 
-        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_possible_truncation, clippy::unnecessary_cast)]
         recorder.configure_loopback(
             config.audio_loopback.output_device_index,
             config.audio_loopback.output_device_name.clone(),
@@ -732,7 +732,7 @@ impl<T: Transport + 'static> SyncManager<T> {
         }
         if let Ok(mut rec) = self.audio_recorder.lock() {
             rec.hang_time_seconds = new_config.sync.hang_time_seconds;
-            #[allow(clippy::cast_possible_truncation)]
+            #[allow(clippy::cast_possible_truncation, clippy::unnecessary_cast)]
             rec.configure_loopback(
                 new_config.audio_loopback.output_device_index,
                 new_config.audio_loopback.output_device_name.clone(),

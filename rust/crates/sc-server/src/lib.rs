@@ -73,7 +73,10 @@ impl<T: Transport + Send + 'static> ServerState<T> {
                 let _ = std::fs::copy(path, &bak_path);
             }
         }
-        if let Err(err) = config.save_to_file(path) {
+        if let Err(err) = config
+            .to_json_string()
+            .and_then(|json| std::fs::write(path, json).map_err(sc_core::ConfigError::from))
+        {
             tracing::error!(path = %path.display(), error = %err, "Failed to save config.json");
         }
     }
