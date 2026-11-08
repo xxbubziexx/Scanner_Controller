@@ -1,0 +1,14 @@
+{
+  "scanner_id": "scanner_a",
+  "model": "SDS100",
+  "connected": true,
+  "receiving": true,
+  "system_name": "MOSWIN",
+  "dept_name": "Troop C Tactical",
+  "channel_name": "Troop C Enc Tac",
+  "frequency": 853.5,
+  "tgid": "51022",
+  "modulation": "NFM",
+  "rssi": 5,
+  "status_line": "RECV: Troop C Enc Tac"
+}

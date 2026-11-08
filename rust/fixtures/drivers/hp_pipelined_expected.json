@@ -1,0 +1,14 @@
+{
+  "scanner_id": "scanner_a",
+  "model": "BCD436HP",
+  "connected": true,
+  "receiving": true,
+  "system_name": "St. Francois County",
+  "dept_name": "Sheriff Dispatch",
+  "channel_name": "Law 1 Dispatch",
+  "frequency": 155.7975,
+  "tgid": null,
+  "modulation": "NFM",
+  "rssi": 4,
+  "status_line": "RECV: Law 1 Dispatch"
+}

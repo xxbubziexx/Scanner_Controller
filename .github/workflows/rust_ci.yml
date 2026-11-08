@@ -1,0 +1,58 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'rust/**'
+      - '.github/workflows/rust_ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'rust/**'
+      - '.github/workflows/rust_ci.yml'
+
+jobs:
+  check-format:
+    name: Code Formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check Formatting
+        working-directory: rust
+        run: cargo fmt --all -- --check
+
+  clippy-and-test:
+    name: Clippy & Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Clippy Lints
+        working-directory: rust
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Cargo Test
+        working-directory: rust
+        run: cargo test --workspace
+
+  aarch64-check:
+    name: aarch64-unknown-linux-gnu (Raspberry Pi Target)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - name: Cross-check Raspberry Pi compilation
+        working-directory: rust
+        run: cargo check --workspace --target aarch64-unknown-linux-gnu
+

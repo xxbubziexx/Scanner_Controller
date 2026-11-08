@@ -1,0 +1,14 @@
+{
+  "scanner_id": "scanner_b",
+  "model": "BCD996P2",
+  "connected": true,
+  "receiving": true,
+  "system_name": "MOSWIN",
+  "dept_name": "St. Francois County",
+  "channel_name": "County Fire Main",
+  "frequency": 85.35,
+  "tgid": "10401",
+  "modulation": "NFM",
+  "rssi": 5,
+  "status_line": "RECV: County Fire Main"
+}

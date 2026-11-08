@@ -1,0 +1,1 @@
+MDL,SDS100GLG,853.5000,NFM,,0,MOSWIN,State Highway Patrol,Troop C Tac,0,0,0,0,0,0PWR,5,853.5000GSI,<XML>,<ScannerInfo><Department Name="Troop C Tactical"/><ConvFrequency Name="Troop C Enc Tac" Freq="853.5000" TGID="51022"/><Property P25Status="Enc" Mute="Mute" RecSlot="/1" U_Id="720101" Rssi="5"/></ScannerInfo>

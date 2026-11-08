@@ -1,0 +1,9 @@
+{
+  "sample_rate": 16000,
+  "total_samples": 40000,
+  "voice_start_sample": 8000,
+  "voice_end_sample": 24000,
+  "expected_gate_open_sample": 8000,
+  "hang_time_ms": 300,
+  "expected_gate_close_sample": 28800
+}

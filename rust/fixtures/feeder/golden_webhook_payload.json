@@ -1,0 +1,13 @@
+{
+  "scanner_id": "scanner_a",
+  "scanner_model": "BCD436HP",
+  "system_name": "Metropolitan P25 Trunk",
+  "department_name": "Fire & Rescue",
+  "channel_name": "Dispatch North",
+  "tgid": "10401",
+  "frequency": 851.25,
+  "modulation": "NFM",
+  "rssi": 4,
+  "timestamp": 1790184600.0,
+  "duration_seconds": 4.5
+}

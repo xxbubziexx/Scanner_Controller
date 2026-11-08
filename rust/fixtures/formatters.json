@@ -1,0 +1,325 @@
+{
+  "metadata_snapshot": {
+    "Scanner": "BCD996P2",
+    "EndingDate": "20260924003530",
+    "FavoriteName": "Public Safety Favorites",
+    "SystemName": "Metropolitan P25 Trunk",
+    "SiteName": "Metro Tower 1",
+    "DepartmentName": "Fire & Rescue",
+    "ChannelName": "Dispatch North",
+    "Frequency": "851.2500",
+    "Modulation": "NFM",
+    "Tone": "DCS023",
+    "TGID": "10401",
+    "UID": "704101",
+    "UID#": "101",
+    "FTOA": "851.2500",
+    "FTOB": "851.2500",
+    "RSSI": "4",
+    "AlertColor": "Blue",
+    "ServiceType": "Fire Dispatch",
+    "DisplayedSystemType": "P25 Standard",
+    "DigitalStatus": "P25 Phase 1",
+    "DMRSlot": "1",
+    "ScannerMode": "Hold"
+  },
+  "fixed_now": "2026-09-23T15:30:00",
+  "template_cases": [
+    {
+      "template": "%FT",
+      "description": "Frequency / TGID hybrid",
+      "engine_a_expected": "10401",
+      "engine_b_expected": "10401"
+    },
+    {
+      "template": "%TG",
+      "description": "TalkGroup",
+      "engine_a_expected": "10401",
+      "engine_b_expected": "10401"
+    },
+    {
+      "template": "%L2",
+      "description": "System Name line 2",
+      "engine_a_expected": "Metropolitan P25 Trunk",
+      "engine_b_expected": "Metropolitan P25 Trunk"
+    },
+    {
+      "template": "%L1",
+      "description": "Channel Name line 1",
+      "engine_a_expected": "Dispatch North",
+      "engine_b_expected": "Dispatch North"
+    },
+    {
+      "template": "%ST1",
+      "description": "Service Type",
+      "engine_a_expected": "Fire Dispatch",
+      "engine_b_expected": "Metropolitan P25 TrunkT1"
+    },
+    {
+      "template": "%STC",
+      "description": "Service Color",
+      "engine_a_expected": "Red",
+      "engine_b_expected": "Metropolitan P25 TrunkTC"
+    },
+    {
+      "template": "%AC",
+      "description": "Alert Color",
+      "engine_a_expected": "Blue",
+      "engine_b_expected": "%AC"
+    },
+    {
+      "template": "%SC",
+      "description": "Scanner State",
+      "engine_a_expected": "Hold",
+      "engine_b_expected": "Metropolitan P25 TrunkC"
+    },
+    {
+      "template": "%ST",
+      "description": "Scanner Model Name",
+      "engine_a_expected": "BCD996P2",
+      "engine_b_expected": "Metropolitan P25 TrunkT"
+    },
+    {
+      "template": "%DD",
+      "description": "Day 2-digit",
+      "engine_a_expected": "23",
+      "engine_b_expected": "%DD"
+    },
+    {
+      "template": "%DT",
+      "description": "Date & Time formatted",
+      "engine_a_expected": "09/23/26 3:30:00 PM",
+      "engine_b_expected": "%DT"
+    },
+    {
+      "template": "%TT",
+      "description": "Time formatted",
+      "engine_a_expected": "3:30:00 PM",
+      "engine_b_expected": "DCS023T"
+    },
+    {
+      "template": "%H",
+      "description": "Hour 24-hr",
+      "engine_a_expected": "15",
+      "engine_b_expected": "%H"
+    },
+    {
+      "template": "%MM",
+      "description": "Month Name 3-char",
+      "engine_a_expected": "Sep",
+      "engine_b_expected": "%MM"
+    },
+    {
+      "template": "%YY",
+      "description": "Year 4-digit",
+      "engine_a_expected": "2026",
+      "engine_b_expected": "%YY"
+    },
+    {
+      "template": "%AF1",
+      "description": "Program Path",
+      "engine_a_expected": "C:\\ProScan\\ProScan.exe",
+      "engine_b_expected": "%AF1"
+    },
+    {
+      "template": "%AF2",
+      "description": "Program Filename",
+      "engine_a_expected": "ProScan.exe",
+      "engine_b_expected": "%AF2"
+    },
+    {
+      "template": "%FA",
+      "description": "Favorite Name",
+      "engine_a_expected": "Public Safety Favorites",
+      "engine_b_expected": "Public Safety Favorites"
+    },
+    {
+      "template": "%SI",
+      "description": "Site Name",
+      "engine_a_expected": "Metro Tower 1",
+      "engine_b_expected": "Metro Tower 1"
+    },
+    {
+      "template": "%S",
+      "description": "System Name",
+      "engine_a_expected": "Metropolitan P25 Trunk",
+      "engine_b_expected": "Metropolitan P25 Trunk"
+    },
+    {
+      "template": "%G",
+      "description": "Department / Group Name",
+      "engine_a_expected": "Fire & Rescue",
+      "engine_b_expected": "Fire & Rescue"
+    },
+    {
+      "template": "%B",
+      "description": "Department / Group Name (alias B)",
+      "engine_a_expected": "Fire & Rescue",
+      "engine_b_expected": "Fire & Rescue"
+    },
+    {
+      "template": "%DE",
+      "description": "Department Name (alias DE)",
+      "engine_a_expected": "Fire & Rescue",
+      "engine_b_expected": "Fire & Rescue"
+    },
+    {
+      "template": "%D",
+      "description": "Full Date",
+      "engine_a_expected": "09/23/26",
+      "engine_b_expected": "%D"
+    },
+    {
+      "template": "%M",
+      "description": "Month 2-digit",
+      "engine_a_expected": "09",
+      "engine_b_expected": "%M"
+    },
+    {
+      "template": "%Y",
+      "description": "Year 2-digit",
+      "engine_a_expected": "26",
+      "engine_b_expected": "%Y"
+    },
+    {
+      "template": "%C",
+      "description": "Channel Name",
+      "engine_a_expected": "Dispatch North",
+      "engine_b_expected": "Dispatch North"
+    },
+    {
+      "template": "%F",
+      "description": "Frequency with DMR slot",
+      "engine_a_expected": "851.2500S1",
+      "engine_b_expected": "851.2500S1"
+    },
+    {
+      "template": "%T",
+      "description": "Tone",
+      "engine_a_expected": "DCS023",
+      "engine_b_expected": "DCS023"
+    },
+    {
+      "template": "%MD",
+      "description": "Modulation",
+      "engine_a_expected": "NFM",
+      "engine_b_expected": "NFM"
+    },
+    {
+      "template": "%R",
+      "description": "RSSI",
+      "engine_a_expected": "4",
+      "engine_b_expected": "4"
+    },
+    {
+      "template": "%s",
+      "description": "Space character",
+      "engine_a_expected": "%s",
+      "engine_b_expected": "%s"
+    },
+    {
+      "template": "%U1",
+      "description": "UID",
+      "engine_a_expected": "704101",
+      "engine_b_expected": "704101"
+    },
+    {
+      "template": "%U2",
+      "description": "UID Number",
+      "engine_a_expected": "101",
+      "engine_b_expected": "101"
+    },
+    {
+      "template": "%U3",
+      "description": "UID Number (alias U3)",
+      "engine_a_expected": "101",
+      "engine_b_expected": "101"
+    },
+    {
+      "template": "%TA",
+      "description": "FTOA",
+      "engine_a_expected": "851.2500",
+      "engine_b_expected": "DCS023A"
+    },
+    {
+      "template": "%TB",
+      "description": "FTOB",
+      "engine_a_expected": "851.2500",
+      "engine_b_expected": "DCS023B"
+    },
+    {
+      "template": "%P",
+      "description": "Comm Port",
+      "engine_a_expected": "5",
+      "engine_b_expected": "%P"
+    },
+    {
+      "template": "%MM-%M-%YY-%Y",
+      "description": "Three Inversions 1",
+      "engine_a_expected": "Sep-09-2026-26",
+      "engine_b_expected": "%MM-%M-%YY-%Y"
+    },
+    {
+      "template": "%D %DD",
+      "description": "Three Inversions 2",
+      "engine_a_expected": "09/23/26 23",
+      "engine_b_expected": "%D %DD"
+    },
+    {
+      "template": "%YY%M%DD_%H%TT_%C_%F",
+      "description": "Standard recording template",
+      "engine_a_expected": "20260923_153:30:00 PM_Dispatch North_851.2500S1",
+      "engine_b_expected": "%YY%M%DD_%HDCS023T_Dispatch North_851.2500S1"
+    },
+    {
+      "template": "[%S] [%G] - %C (%TG) - %F %MD (%T)",
+      "description": "Detailed title template",
+      "engine_a_expected": "[Metropolitan P25 Trunk] [Fire & Rescue] - Dispatch North (10401) - 851.2500S1 NFM (DCS023)",
+      "engine_b_expected": "[Metropolitan P25 Trunk] [Fire & Rescue] - Dispatch North (10401) - 851.2500S1 NFM (DCS023)"
+    },
+    {
+      "template": "%S/%G/%C",
+      "description": "Subfolder path template",
+      "engine_a_expected": "Metropolitan P25 Trunk/Fire & Rescue/Dispatch North",
+      "engine_b_expected": "Metropolitan P25 Trunk/Fire & Rescue/Dispatch North"
+    },
+    {
+      "template": "%C - %S - %G",
+      "description": "Streaming standard",
+      "engine_a_expected": "Dispatch North - Metropolitan P25 Trunk - Fire & Rescue",
+      "engine_b_expected": "Dispatch North - Metropolitan P25 Trunk - Fire & Rescue"
+    },
+    {
+      "template": "%CL Listeners: %C on %F",
+      "description": "Streaming with listener count",
+      "engine_a_expected": "Dispatch NorthL Listeners: Dispatch North on 851.2500S1",
+      "engine_b_expected": "42 Listeners: Dispatch North on 851.2500S1"
+    }
+  ],
+  "sanitizer_cases": [
+    {
+      "raw": "Fire / Rescue: Tac 1 *Main*? <North>",
+      "clean_ascii": "Fire / Rescue: Tac 1 *Main*? <North>",
+      "sanitized_filename": "Fire - Rescue- Tac 1 Main North",
+      "sanitized_folder": "Fire - Rescue- Tac 1 Main North\\"
+    },
+    {
+      "raw": "COM1: Special \"Aux\" | Output",
+      "clean_ascii": "COM1: Special \"Aux\" | Output",
+      "sanitized_filename": "COM1- Special Aux  Output",
+      "sanitized_folder": "COM1- Special Aux  Output\\"
+    },
+    {
+      "raw": "Normal_Channel_Name-155.7975",
+      "clean_ascii": "Normal_Channel_Name-155.7975",
+      "sanitized_filename": "Normal_Channel_Name-155.7975",
+      "sanitized_folder": "Normal_Channel_Name-155.7975\\"
+    },
+    {
+      "raw": "Folder/Sub:Folder\\Path",
+      "clean_ascii": "Folder/Sub:Folder\\Path",
+      "sanitized_filename": "Folder-Sub-Folder-Path",
+      "sanitized_folder": "Folder-Sub-Folder\\Path\\"
+    }
+  ]
+}

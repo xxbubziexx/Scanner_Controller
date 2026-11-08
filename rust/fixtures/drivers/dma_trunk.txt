@@ -1,0 +1,1 @@
+MDL,BCD996P2STS,00000000000000, F0:---------9 17:29    ,, S0:--2------- Sep23    ,GLG,ID:10401,NFM,,0,MOSWIN,St. Francois County,County Fire Main,1,,,,,0VOL,12SQL,2PWR,5,85350000

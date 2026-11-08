@@ -1,0 +1,14 @@
+{
+  "scanner_id": "scanner_b",
+  "model": "BCD996P2",
+  "connected": true,
+  "receiving": false,
+  "system_name": "Scanning...",
+  "dept_name": "",
+  "channel_name": "",
+  "frequency": null,
+  "tgid": null,
+  "modulation": "NFM",
+  "rssi": 0,
+  "status_line": "SCANNING"
+}
