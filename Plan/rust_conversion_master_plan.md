@@ -176,19 +176,19 @@ The phase sections below are summaries. The detailed checklists and exit gates l
 
 **Goal:** Talk to real scanners from Rust, with protocol logic testable without hardware.
 
-- [ ] Define a `Transport` trait (`send_line`, `read_until_cr`, timeouts) with three implementations:
+- [x] Define a `Transport` trait (`send_line`, `read_until_cr`, timeouts) with three implementations:
   `SerialTransport`, `UdpTransport` (LAN models), and `ReplayTransport` (fixture transcripts) for tests.
-- [ ] Split each driver into a **pure codec** (build command bytes / parse response → `ScannerStatus`)
+- [x] Split each driver into a **pure codec** (build command bytes / parse response → `ScannerStatus`)
   and a thin I/O shell. All parsing is unit tested against Phase 0 transcripts.
-- [ ] Port dialects: DMA (`BCD996P2`, 325P2, XT), HP (`BCD436HP`, 536HP, SDS100/200, incl. GSI XML via
+- [x] Port dialects: DMA (`BCD996P2`, 325P2, XT), HP (`BCD436HP`, 536HP, SDS100/200, incl. GSI XML via
   `quick-xml`), classic. Port `normalize_frequency` and `extract_section` exactly.
-- [ ] Control actions: skip / hold / KEYPRESS lockout (`KEYPAD-AND-DISPLAY.md`, `SERIAL-POLLING...` §1.5).
-- [ ] Port-open handshake (§1.6), reconnect back-off (`should_try_connect`).
-- [ ] `sc-discovery`: enumerate ports, MDL/SI probe (`parse_mdl_response`, `parse_si_response`,
+- [x] Control actions: skip / hold / KEYPRESS lockout (`KEYPAD-AND-DISPLAY.md`, `SERIAL-POLLING...` §1.5).
+- [x] Port-open handshake (§1.6), reconnect back-off (`should_try_connect`).
+- [x] `sc-discovery`: enumerate ports, MDL/SI probe (`parse_mdl_response`, `parse_si_response`,
   `extract_port_digits` ordering), UDP LAN probe (`parse_sus_response`).
-- [ ] Spike: `serialport` (blocking, one thread per scanner) vs `tokio-serial`. Pick based on Windows
+- [x] Spike: `serialport` (blocking, one thread per scanner) vs `tokio-serial`. Pick based on Windows
   COM latency at 150 ms poll interval and write the choice down in `ACTIVE_CONTEXT.md`.
-- [ ] Port `tools/probe_keypad.py` → `scanner-controller probe-keypad` subcommand.
+- [x] Port `tools/probe_keypad.py` → `scanner-controller probe-keypad` subcommand.
 
 **Exit gate:** replay tests green, plus a manual hardware test on a 996P2 **and** a 436HP: 30 min of polling,
 status matches the Python driver side by side, no port lockups after unplug/replug.

@@ -190,7 +190,11 @@ def generate_metadata_fixtures():
     with open(os.path.join(meta_dir, "empty_templates_riff.bin"), "wb") as f:
         f.write(empty_templates_wav)
 
-    print(f"[OK] Generated {len(matrix) * 3 + 2} metadata binary fixtures in {meta_dir}")
+    cases_dict = {name: dataclasses.asdict(meta) for name, meta in matrix.items()}
+    with open(os.path.join(meta_dir, "metadata_cases.json"), "w", encoding="utf-8") as f:
+        json.dump(cases_dict, f, indent=2)
+
+    print(f"[OK] Generated {len(matrix) * 3 + 2} metadata binary fixtures and metadata_cases.json in {meta_dir}")
 
 
 def generate_formatter_fixtures():
@@ -320,12 +324,21 @@ def generate_formatter_fixtures():
 
 
 def generate_driver_fixtures():
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from config import ScannerConfig, ScannerModel
+    from drivers.bcd996p2 import BCD996P2Driver
+    from drivers.bcd436hp import BCD436HPDriver
+
     drv_dir = os.path.join(FIXTURES_DIR, "drivers")
     os.makedirs(drv_dir, exist_ok=True)
 
-    transcripts = {
-        "dma_conventional": {
-            "raw": (
+    raw_cases = {
+        "dma_conventional": (
+            "scanner_b",
+            ScannerModel.BCD996P2,
+            BCD996P2Driver,
+            (
                 "MDL,BCD996P2\r"
                 "STS,00000000000000, F0:---------9 17:29    ,, S0:--2------- Sep23    ,\r"
                 "GLG,155.7975,NFM,,0,St. Francois County,Sheriff Dispatch,Law 1 Dispatch,1,,,,,0\r"
@@ -333,23 +346,12 @@ def generate_driver_fixtures():
                 "SQL,2\r"
                 "PWR,4,15579750\r"
             ),
-            "parsed": {
-                "scanner_id": "scanner_b",
-                "model": "BCD996P2",
-                "connected": True,
-                "receiving": True,
-                "system_name": "St. Francois County",
-                "dept_name": "Sheriff Dispatch",
-                "channel_name": "Law 1 Dispatch",
-                "frequency": 155.7975,
-                "tgid": None,
-                "modulation": "NFM",
-                "rssi": 4,
-                "status_line": "RECV: Law 1 Dispatch"
-            }
-        },
-        "dma_trunk": {
-            "raw": (
+        ),
+        "dma_trunk": (
+            "scanner_b",
+            ScannerModel.BCD996P2,
+            BCD996P2Driver,
+            (
                 "MDL,BCD996P2\r"
                 "STS,00000000000000, F0:---------9 17:29    ,, S0:--2------- Sep23    ,\r"
                 "GLG,ID:10401,NFM,,0,MOSWIN,St. Francois County,County Fire Main,1,,,,,0\r"
@@ -357,23 +359,12 @@ def generate_driver_fixtures():
                 "SQL,2\r"
                 "PWR,5,85350000\r"
             ),
-            "parsed": {
-                "scanner_id": "scanner_b",
-                "model": "BCD996P2",
-                "connected": True,
-                "receiving": True,
-                "system_name": "MOSWIN",
-                "dept_name": "St. Francois County",
-                "channel_name": "County Fire Main",
-                "frequency": 85.35,
-                "tgid": "10401",
-                "modulation": "NFM",
-                "rssi": 5,
-                "status_line": "RECV: County Fire Main"
-            }
-        },
-        "dma_scanning": {
-            "raw": (
+        ),
+        "dma_scanning": (
+            "scanner_b",
+            ScannerModel.BCD996P2,
+            BCD996P2Driver,
+            (
                 "MDL,BCD996P2\r"
                 "STS,00000000000000, F0:---------9 17:29    ,, S0:--2------- Sep23    ,\r"
                 "GLG,,,,0,Scanning...,,,0,,,,,0\r"
@@ -381,23 +372,12 @@ def generate_driver_fixtures():
                 "SQL,2\r"
                 "PWR,0,0\r"
             ),
-            "parsed": {
-                "scanner_id": "scanner_b",
-                "model": "BCD996P2",
-                "connected": True,
-                "receiving": False,
-                "system_name": "Scanning...",
-                "dept_name": "",
-                "channel_name": "",
-                "frequency": None,
-                "tgid": None,
-                "modulation": "NFM",
-                "rssi": 0,
-                "status_line": "SCANNING"
-            }
-        },
-        "hp_pipelined": {
-            "raw": (
+        ),
+        "hp_pipelined": (
+            "scanner_a",
+            ScannerModel.BCD436HP,
+            BCD436HPDriver,
+            (
                 "MDL,BCD436HP\r"
                 "STS,00110110110000, F0:---------9 17:29    ,, S0:--2------- Sep23    ,\r"
                 "GLG,155.7975,NFM,,0,St. Francois County,Sheriff,Law 1,0,1,0,0,0,0\r"
@@ -410,23 +390,12 @@ def generate_driver_fixtures():
                 "<Property P25Status=\"None\" Mute=\"Unmute\" RecSlot=\"\" U_Id=\"\" Rssi=\"4\"/>"
                 "</ScannerInfo>\r"
             ),
-            "parsed": {
-                "scanner_id": "scanner_a",
-                "model": "BCD436HP",
-                "connected": True,
-                "receiving": True,
-                "system_name": "St. Francois County",
-                "dept_name": "Sheriff Dispatch",
-                "channel_name": "Law 1 Dispatch",
-                "frequency": 155.7975,
-                "tgid": None,
-                "modulation": "NFM",
-                "rssi": 4,
-                "status_line": "RECV: Law 1 Dispatch"
-            }
-        },
-        "hp_encrypted": {
-            "raw": (
+        ),
+        "hp_encrypted": (
+            "scanner_a",
+            ScannerModel.SDS100,
+            BCD436HPDriver,
+            (
                 "MDL,SDS100\r"
                 "GLG,853.5000,NFM,,0,MOSWIN,State Highway Patrol,Troop C Tac,0,0,0,0,0,0\r"
                 "PWR,5,853.5000\r"
@@ -436,30 +405,38 @@ def generate_driver_fixtures():
                 "<Property P25Status=\"Enc\" Mute=\"Mute\" RecSlot=\"/1\" U_Id=\"720101\" Rssi=\"5\"/>"
                 "</ScannerInfo>\r"
             ),
-            "parsed": {
-                "scanner_id": "scanner_a",
-                "model": "SDS100",
-                "connected": True,
-                "receiving": True,
-                "system_name": "MOSWIN",
-                "dept_name": "Troop C Tactical",
-                "channel_name": "Troop C Enc Tac",
-                "frequency": 853.5,
-                "tgid": "51022",
-                "modulation": "NFM",
-                "rssi": 5,
-                "status_line": "RECV: Troop C Enc Tac"
-            }
-        }
+        ),
     }
 
-    for name, item in transcripts.items():
-        with open(os.path.join(drv_dir, f"{name}.txt"), "w", encoding="utf-8") as f:
-            f.write(item["raw"])
-        with open(os.path.join(drv_dir, f"{name}_expected.json"), "w", encoding="utf-8") as f:
-            json.dump(item["parsed"], f, indent=2)
+    for name, (scanner_id, model_enum, driver_cls, raw_resp) in raw_cases.items():
+        cfg = ScannerConfig(id=scanner_id, name=name, model=model_enum, port="COM5")
+        drv = driver_cls(cfg)
+        drv.status.connected = True
+        with patch.object(drv, "_send_command", new_callable=AsyncMock) as mock_cmd:
+            mock_cmd.return_value = raw_resp
+            status = asyncio.run(drv.poll())
 
-    print(f"[OK] Generated {len(transcripts)} driver transcripts in {drv_dir}")
+        expected_dict = {
+            "scanner_id": status.scanner_id,
+            "model": status.model,
+            "connected": status.connected,
+            "receiving": status.receiving,
+            "system_name": status.system_name,
+            "dept_name": status.dept_name,
+            "channel_name": status.channel_name,
+            "frequency": status.frequency,
+            "tgid": status.tgid,
+            "modulation": status.modulation,
+            "rssi": status.rssi,
+            "status_line": status.status_line,
+        }
+
+        with open(os.path.join(drv_dir, f"{name}.txt"), "w", encoding="utf-8", newline="") as f:
+            f.write(raw_resp)
+        with open(os.path.join(drv_dir, f"{name}_expected.json"), "w", encoding="utf-8") as f:
+            json.dump(expected_dict, f, indent=2)
+
+    print(f"[OK] Generated {len(raw_cases)} driver transcripts in {drv_dir}")
 
 
 def generate_audio_fixtures():

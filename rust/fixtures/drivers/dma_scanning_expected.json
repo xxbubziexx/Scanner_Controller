@@ -5,7 +5,7 @@
   "receiving": false,
   "system_name": "Scanning...",
   "dept_name": "",
-  "channel_name": "",
+  "channel_name": "Scanning...",
   "frequency": null,
   "tgid": null,
   "modulation": "NFM",

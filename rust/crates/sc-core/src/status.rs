@@ -58,8 +58,10 @@ fn round_freq(f: f64) -> f64 {
 
 /// Represents the instantaneous operational state of a physical scanner radio.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct ScannerStatus {
     pub scanner_id: String,
+    #[serde(default)]
     pub name: String,
     pub model: String,
     pub connected: bool,
@@ -69,10 +71,18 @@ pub struct ScannerStatus {
     pub channel_name: String,
     pub tgid: Option<String>,
     pub frequency: Option<f64>,
-    pub rssi: u8,
+    pub rssi: i32,
     pub modulation: String,
+    #[serde(default)]
+    pub unit_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tone: Option<String>,
     pub status_line: String,
-    pub last_poll_time: f64,
+    #[serde(default)]
+    pub avoided: bool,
+    #[serde(default)]
+    pub last_update: f64,
+    #[serde(default, skip_serializing)]
     pub mute_state: bool,
 }
 
@@ -97,8 +107,11 @@ impl ScannerStatus {
             frequency: None,
             rssi: 0,
             modulation: "NFM".to_string(),
+            unit_id: None,
+            tone: None,
             status_line: "SCANNING".to_string(),
-            last_poll_time: 0.0,
+            avoided: false,
+            last_update: 0.0,
             mute_state: false,
         }
     }

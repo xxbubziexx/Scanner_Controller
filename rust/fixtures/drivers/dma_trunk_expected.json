@@ -6,7 +6,7 @@
   "system_name": "MOSWIN",
   "dept_name": "St. Francois County",
   "channel_name": "County Fire Main",
-  "frequency": 85.35,
+  "frequency": 853.5,
   "tgid": "10401",
   "modulation": "NFM",
   "rssi": 5,

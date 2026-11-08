@@ -1,0 +1,22 @@
+[package]
+name = "scanner-controller"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+sc-core = { path = "../../crates/sc-core" }
+sc-metadata = { path = "../../crates/sc-metadata" }
+sc-drivers = { path = "../../crates/sc-drivers" }
+sc-discovery = { path = "../../crates/sc-discovery" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde_json = { workspace = true }
+serialport = { workspace = true }

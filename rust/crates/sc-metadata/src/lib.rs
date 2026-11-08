@@ -99,25 +99,91 @@ mod tests {
     }
 
     #[test]
-    fn test_pros_chunk_fixtures_byte_exact() {
+    fn test_all_23_binary_metadata_fixtures_byte_exact() {
         let fixtures_dir = get_fixtures_dir().join("metadata");
-        let formatters_path = get_fixtures_dir().join("formatters.json");
-        let content = std::fs::read_to_string(formatters_path).unwrap();
-        let json: Value = serde_json::from_str(&content).unwrap();
-        let _meta: ProScanMetadata =
-            serde_json::from_value(json["metadata_snapshot"].clone()).unwrap();
+        let cases_path = fixtures_dir.join("metadata_cases.json");
+        let content =
+            std::fs::read_to_string(&cases_path).expect("Failed to read metadata_cases.json");
+        let cases_map: std::collections::HashMap<String, ProScanMetadata> =
+            serde_json::from_str(&content).expect("Failed to parse metadata_cases.json");
 
-        // Check typical_conventional pros chunk fixture
-        let fixture_path = fixtures_dir.join("typical_conventional_pros.bin");
-        if fixture_path.exists() {
-            let fixture_bytes = std::fs::read(&fixture_path).unwrap();
+        // Fixed test date matching Python generator
+        let fixed_now = chrono::Local
+            .from_local_datetime(
+                &chrono::NaiveDateTime::parse_from_str("2026-09-23 15:30:00", "%Y-%m-%d %H:%M:%S")
+                    .unwrap(),
+            )
+            .single()
+            .unwrap();
+
+        // Extract dummy_mp3 from empty_templates_id3.bin (which returns dummy_mp3 untouched)
+        let empty_id3_path = fixtures_dir.join("empty_templates_id3.bin");
+        let dummy_mp3 =
+            std::fs::read(&empty_id3_path).expect("Failed to read empty_templates_id3.bin");
+
+        // Extract dummy_pcm from typical_conventional_riff.bin (header is 44 bytes, PCM is 32000 bytes)
+        let conv_riff_path = fixtures_dir.join("typical_conventional_riff.bin");
+        let conv_riff_bytes =
+            std::fs::read(&conv_riff_path).expect("Failed to read conv riff fixture");
+        let dummy_pcm = &conv_riff_bytes[44..44 + 32000];
+
+        for (name, meta) in &cases_map {
+            // 1. Check pros chunk
+            let pros_file = fixtures_dir.join(format!("{name}_pros.bin"));
+            let expected_pros = std::fs::read(&pros_file).expect("pros fixture missing");
+            let actual_pros = build_pros_chunk(meta);
+            assert_eq!(
+                actual_pros, expected_pros,
+                "PROS chunk mismatch for '{name}'"
+            );
+
+            // Verify parse_pros_chunk roundtrip
             let (parsed, read_len) =
-                parse_pros_chunk(&fixture_bytes).expect("Failed to parse pros fixture");
-            assert_eq!(read_len, fixture_bytes.len());
-            assert_eq!(parsed.scanner, "BCD996P2");
-            assert_eq!(parsed.system_name, "St. Francois County");
-            assert_eq!(parsed.frequency, "155.7975");
+                parse_pros_chunk(&expected_pros).expect("Failed to parse pros chunk");
+            assert_eq!(read_len, expected_pros.len());
+            let rebuilt = build_pros_chunk(&parsed);
+            assert_eq!(rebuilt, expected_pros, "PROS rebuilt mismatch for '{name}'");
+
+            // 2. Check MP3 ID3v2.3 tag
+            let id3_file = fixtures_dir.join(format!("{name}_id3.bin"));
+            let expected_id3 = std::fs::read(&id3_file).expect("id3 fixture missing");
+            let actual_id3 = write_mp3_id3v23(&dummy_mp3, meta, "%C", "%S", "%G", Some(fixed_now));
+            assert_eq!(
+                actual_id3, expected_id3,
+                "MP3 ID3 tag mismatch for '{name}'"
+            );
+
+            // 3. Check WAV RIFF INFO container
+            let riff_file = fixtures_dir.join(format!("{name}_riff.bin"));
+            let expected_riff = std::fs::read(&riff_file).expect("riff fixture missing");
+            let actual_riff =
+                write_wav_riff_info(dummy_pcm, meta, "%C", "%S", 16000, 1, 16, Some(fixed_now));
+            assert_eq!(
+                actual_riff, expected_riff,
+                "WAV RIFF container mismatch for '{name}'"
+            );
         }
+
+        // Test edge case: empty templates MP3
+        let typical_conv = &cases_map["typical_conventional"];
+        let actual_empty_id3 =
+            write_mp3_id3v23(&dummy_mp3, typical_conv, "", "", "", Some(fixed_now));
+        assert_eq!(actual_empty_id3, dummy_mp3);
+
+        // Test edge case: empty templates WAV
+        let empty_riff_path = fixtures_dir.join("empty_templates_riff.bin");
+        let expected_empty_riff = std::fs::read(&empty_riff_path).unwrap();
+        let actual_empty_riff = write_wav_riff_info(
+            dummy_pcm,
+            typical_conv,
+            "",
+            "",
+            16000,
+            1,
+            16,
+            Some(fixed_now),
+        );
+        assert_eq!(actual_empty_riff, expected_empty_riff);
     }
 
     #[test]

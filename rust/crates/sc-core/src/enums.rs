@@ -54,6 +54,85 @@ pub enum ScannerModel {
 }
 
 impl ScannerModel {
+    /// All 34 supported `ScannerModel` variants in canonical order.
+    pub const ALL: [Self; 34] = [
+        Self::BCD436HP,
+        Self::BCD996P2,
+        Self::BCD536HP,
+        Self::SDS100,
+        Self::SDS200,
+        Self::BCD325P2,
+        Self::BCD996XT,
+        Self::BCD396XT,
+        Self::BCT15X,
+        Self::BCT15,
+        Self::BC346XT,
+        Self::BC346XTC,
+        Self::BR330T,
+        Self::BCD396T,
+        Self::BCD996T,
+        Self::BC250D,
+        Self::BC296D,
+        Self::BC780XLT,
+        Self::BC785D,
+        Self::BC796D,
+        Self::SDS150,
+        Self::SDS100E,
+        Self::SDS200E,
+        Self::USDS100,
+        Self::UBCD3600XLT,
+        Self::BCD160DN,
+        Self::BCD260DN,
+        Self::BC125AT,
+        Self::UBCD160DN,
+        Self::UBCD260DN,
+        Self::UBCD436PT,
+        Self::UBCD536PT,
+        Self::UBC125XLT,
+        Self::UBC126AT,
+    ];
+
+    /// Returns the exact Uniden `MDL` string representation for this model.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::BCD436HP => "BCD436HP",
+            Self::BCD996P2 => "BCD996P2",
+            Self::BCD536HP => "BCD536HP",
+            Self::SDS100 => "SDS100",
+            Self::SDS200 => "SDS200",
+            Self::BCD325P2 => "BCD325P2",
+            Self::BCD996XT => "BCD996XT",
+            Self::BCD396XT => "BCD396XT",
+            Self::BCT15X => "BCT15X",
+            Self::BCT15 => "BCT15",
+            Self::BC346XT => "BC346XT",
+            Self::BC346XTC => "BC346XTC",
+            Self::BR330T => "BR330T",
+            Self::BCD396T => "BCD396T",
+            Self::BCD996T => "BCD996T",
+            Self::BC250D => "BC250D",
+            Self::BC296D => "BC296D",
+            Self::BC780XLT => "BC780XLT",
+            Self::BC785D => "BC785D",
+            Self::BC796D => "BC796D",
+            Self::SDS150 => "SDS150",
+            Self::SDS100E => "SDS100E",
+            Self::SDS200E => "SDS200E",
+            Self::USDS100 => "USDS100",
+            Self::UBCD3600XLT => "UBCD3600XLT",
+            Self::BCD160DN => "BCD160DN",
+            Self::BCD260DN => "BCD260DN",
+            Self::BC125AT => "BC125AT",
+            Self::UBCD160DN => "UBCD160DN",
+            Self::UBCD260DN => "UBCD260DN",
+            Self::UBCD436PT => "UBCD436PT",
+            Self::UBCD536PT => "UBCD536PT",
+            Self::UBC125XLT => "UBC125XLT",
+            Self::UBC126AT => "UBC126AT",
+        }
+    }
+
     /// Returns model-specific allowed baud rates based on `ProScan` specifications.
     #[must_use]
     pub fn allowed_baud_rates(&self) -> &'static [u32] {

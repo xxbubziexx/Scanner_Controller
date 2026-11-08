@@ -7,29 +7,29 @@
 ---
 
 ## 1. Serial I/O Decision Spike (do first)
-- [ ] Compare `serialport` (blocking, one thread per scanner) with `tokio-serial` on Windows COM latency at the 150 ms poll interval. Record the choice and numbers in `ACTIVE_CONTEXT.md`.
-- [ ] The `Transport` trait shape depends on this result. Do **not** assume `async_trait` with `&mut self`. A blocking thread per port is the default if the spike is a tie.
-- [ ] One owner per port (AGENTS.md prime directive 4). Never open a port the live service may hold.
+- [x] Compare `serialport` (blocking, one thread per scanner) with `tokio-serial` on Windows COM latency at the 150 ms poll interval. Record the choice and numbers in `ACTIVE_CONTEXT.md`.
+- [x] The `Transport` trait shape depends on this result. Do **not** assume `async_trait` with `&mut self`. A blocking thread per port is the default if the spike is a tie.
+- [x] One owner per port (AGENTS.md prime directive 4). Never open a port the live service may hold.
 
 ## 2. Transport Abstraction
-- [ ] `Transport` trait: `send_line`, `read_until_cr`, with timeouts.
-- [ ] `SerialTransport`, `UdpTransport` (LAN models: SDS200, BCD536HP), and `ReplayTransport` (feeds Phase 0 transcripts).
+- [x] `Transport` trait: `send_line`, `read_until_cr`, with timeouts.
+- [x] `SerialTransport`, `UdpTransport` (LAN models: SDS200, BCD536HP), and `ReplayTransport` (feeds Phase 0 transcripts).
 
 ## 3. Pure Codecs + Thin I/O Shell
 Each driver is a pure codec (build command bytes / parse response → `ScannerStatus`) plus a small I/O wrapper.
-- [ ] **DMA** (BCD996P2, 325P2, XT): `GLG`, `PWR`, `VOL`, `SQL`. `normalize_frequency` and `extract_section` ported exactly.
-- [ ] **HomePatrol** (BCD436HP, 536HP, SDS100/200): `STS` parser, `GSI` XML via `quick-xml`.
-- [ ] **Classic** (BC346XT and earlier).
-- [ ] **Factory:** model enum → driver for all 34 models.
-- [ ] **Control actions:** hold, skip, KEYPRESS lockout; port-open handshake; reconnect back-off (`should_try_connect`).
+- [x] **DMA** (BCD996P2, 325P2, XT): `GLG`, `PWR`, `VOL`, `SQL`. `normalize_frequency` and `extract_section` ported exactly.
+- [x] **HomePatrol** (BCD436HP, 536HP, SDS100/200): `STS` parser, `GSI` XML via `quick-xml`.
+- [x] **Classic** (BC346XT and earlier).
+- [x] **Factory:** model enum → driver for all 34 models.
+- [x] **Control actions:** hold, skip, KEYPRESS lockout; port-open handshake; reconnect back-off (`should_try_connect`).
 
 ## 4. `sc-discovery`
-- [ ] Port enumeration with VID/PID filtering.
-- [ ] MDL/SI probe (`parse_mdl_response`, `parse_si_response`, `extract_port_digits` ordering).
-- [ ] UDP LAN probe (`parse_sus_response`).
+- [x] Port enumeration with VID/PID filtering.
+- [x] MDL/SI probe (`parse_mdl_response`, `parse_si_response`, `extract_port_digits` ordering).
+- [x] UDP LAN probe (`parse_sus_response`).
 
 ## 5. CLI
-- [ ] Port `tools/probe_keypad.py` → `scanner-controller probe-keypad` (plus `detect`).
+- [x] Port `tools/probe_keypad.py` → `scanner-controller probe-keypad` (plus `detect`).
 
 ## Exit Gate
 1. All transcripts in `rust/fixtures/drivers/` replay green on every dialect.
