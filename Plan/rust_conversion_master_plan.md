@@ -247,15 +247,15 @@ feeder output is byte-identical to Python for the same inputs.
 
 **Goal:** Drop-in replacement for `server.py`, with the existing web UI working unchanged.
 
-- [ ] `axum` routes, keeping paths, methods and JSON shapes identical:
+- [x] `axum` routes, keeping paths, methods and JSON shapes identical:
   `GET /`, `/favicon.ico`, `/api/state`, `POST /api/config`, `POST /api/scanner/{id}/model`,
   `POST /api/skip/{id}`, `/api/audio/devices`, `/api/audio/output_devices`, `/api/ports/available`,
   `/api/ports/detect`, `/api/scanners/discover_lan`, `/api/models/catalog`, `POST /api/feeder/config`,
   `POST /api/feeder/dispatch_test`, `WS /ws`.
-- [ ] Serve `static/` (embed with `include_dir`/`rust-embed` for single-binary deploys).
-- [ ] Contract tests: record Python responses into `fixtures/api/*.json` and diff them against Rust (ignoring timestamps).
-- [ ] Graceful shutdown: `CancellationToken` → stop polling → flush in-flight recordings → close ports.
-- [ ] systemd unit (`Type=notify` optional), `tracing-journald` logging.
+- [x] Serve `static/` (embed with `include_dir`/`rust-embed` for single-binary deploys).
+- [x] Contract tests: record Python responses into `fixtures/api/*.json` and diff them against Rust (ignoring timestamps).
+- [x] Graceful shutdown: `CancellationToken` → stop polling → flush in-flight recordings → close ports.
+- [x] systemd unit (`Type=notify` optional), `tracing-journald` logging.
 - [ ] **Shadow run:** a serial port can only be opened by one process, so the two stacks can't run
   at the same time on the same radios. Alternate Python and Rust on the live Pi (e.g. daily) for ≥ 7 days,
   each writing to its *own* inbox. Compare calls/hour, durations, exclusion events and metadata.

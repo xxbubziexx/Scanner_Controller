@@ -1,0 +1,110 @@
+{
+  "scanner_a": {
+    "scanner_id": "scanner_a",
+    "name": "Scanner A",
+    "model": "BCD436HP",
+    "connected": false,
+    "receiving": false,
+    "system_name": "Scanning...",
+    "dept_name": "",
+    "channel_name": "",
+    "tgid": null,
+    "frequency": null,
+    "rssi": 0,
+    "modulation": "NFM",
+    "unit_id": null,
+    "status_line": "SCANNING",
+    "avoided": false,
+    "last_update": 1794175522.5179935
+  },
+  "scanner_b": {
+    "scanner_id": "scanner_b",
+    "name": "Scanner B",
+    "model": "BCD996P2",
+    "connected": false,
+    "receiving": false,
+    "system_name": "Scanning...",
+    "dept_name": "",
+    "channel_name": "",
+    "tgid": null,
+    "frequency": null,
+    "rssi": 0,
+    "modulation": "NFM",
+    "unit_id": null,
+    "status_line": "SCANNING",
+    "avoided": false,
+    "last_update": 1794175522.5179935
+  },
+  "config": {
+    "scanner_a": {
+      "id": "scanner_a",
+      "name": "Scanner A",
+      "model": "BCD436HP",
+      "connection_mode": "SERIAL",
+      "port": "COM5",
+      "baud_rate": 115200,
+      "ip_host": "127.0.0.1",
+      "ip_port": 5000,
+      "enabled": true,
+      "poll_interval_ms": 150,
+      "lockout_method": "KEYPRESS",
+      "audio_device_index": null,
+      "audio_channel": "LEFT",
+      "audio_enabled": true,
+      "filename_template": "%DT - %S - %C (%TG)",
+      "tit2_template": "%C (%TG)"
+    },
+    "scanner_b": {
+      "id": "scanner_b",
+      "name": "Scanner B",
+      "model": "BCD996P2",
+      "connection_mode": "SERIAL",
+      "port": "NONE",
+      "baud_rate": 115200,
+      "ip_host": "127.0.0.1",
+      "ip_port": 5000,
+      "enabled": true,
+      "poll_interval_ms": 150,
+      "lockout_method": "KEYPRESS",
+      "audio_device_index": null,
+      "audio_channel": "RIGHT",
+      "audio_enabled": true,
+      "filename_template": "%DT - %S - %C (%TG)",
+      "tit2_template": "%C (%TG)"
+    },
+    "sync": {
+      "enable_sync": true,
+      "exclusion_mode": "TGID_AND_FREQ",
+      "priority_mode": "EQUAL_PEERS",
+      "primary_scanner_id": "scanner_a",
+      "hang_time_seconds": 2.0,
+      "auto_release_seconds": 30.0
+    },
+    "feeder": {
+      "enable_feeder": true,
+      "feeder_mode": "DIRECTORY_DROP",
+      "inbox_directory": "A:\\Scanscribe_Projects\\scanscribe\\inbox",
+      "filename_template": "%DT - %S - %C (%TG)",
+      "tit2_template": "%C (%TG)",
+      "webhook_url": "http://127.0.0.1:5000/api/ingest",
+      "audio_format": "WAV",
+      "audio_device_index": null,
+      "sample_rate": 16000,
+      "enable_sidecar_json": true,
+      "enable_proscan_tags": true
+    },
+    "audio_loopback": {
+      "enabled": true,
+      "output_device_index": null,
+      "volume": 0.8,
+      "pan_mode": "STEREO_SPLIT"
+    }
+  },
+  "active_exclusions": {},
+  "event_log": [],
+  "audio_levels": {
+    "scanner_a": 0,
+    "scanner_b": 0
+  },
+  "audio_level": 0
+}

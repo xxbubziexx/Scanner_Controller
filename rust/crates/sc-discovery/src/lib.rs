@@ -47,6 +47,53 @@ pub struct DiscoveredLanScanner {
     pub raw_response: String,
 }
 
+/// Metadata for an OS-enumerated serial port returned by `GET /api/ports/available` (`server.py:156-188`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AvailablePortInfo {
+    pub device: String,
+    pub description: String,
+    pub hwid: String,
+    pub is_uniden: bool,
+    pub label: String,
+}
+
+/// Lists all serial ports currently enumerated by the OS without opening any port (`server.py:156-188`).
+#[must_use]
+pub fn list_available_ports() -> Vec<AvailablePortInfo> {
+    let Ok(mut raw_ports) = serialport::available_ports() else {
+        return Vec::new();
+    };
+    raw_ports.sort_by_key(|p| extract_port_digits(&p.port_name));
+
+    let mut out = Vec::with_capacity(raw_ports.len());
+    for p in raw_ports {
+        let (description, hwid, is_uniden) = match &p.port_type {
+            SerialPortType::UsbPort(info) => {
+                let prod = info.product.clone().unwrap_or_else(|| p.port_name.clone());
+                let mfg = info.manufacturer.as_deref().unwrap_or("");
+                let hw = format!("USB VID:PID={:04X}:{:04X}", info.vid, info.pid);
+                let uniden = info.vid == 0x1965
+                    || prod.to_ascii_lowercase().contains("uniden")
+                    || mfg.to_ascii_lowercase().contains("uniden");
+                (prod, hw, uniden)
+            }
+            _ => (p.port_name.clone(), String::new(), false),
+        };
+        let mut label = format!("{} - {}", p.port_name, description);
+        if is_uniden {
+            label.push_str(" (Uniden Radio Detected)");
+        }
+        out.push(AvailablePortInfo {
+            device: p.port_name,
+            description,
+            hwid,
+            is_uniden,
+            label,
+        });
+    }
+    out
+}
+
 /// Parses a Uniden `MDL` command response (e.g. `"\rMDL,BCD436HP\r"` -> `Some("BCD436HP")`).
 #[must_use]
 pub fn parse_mdl_response(response: &str) -> Option<String> {

@@ -226,3 +226,28 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - `ProScanMetadataDict` in `sc-feeder` preserves the exact 22 PascalCase keys of Python's `ProScanMetadata.to_dict()` (`"Scanner"`, `"EndingDate"`, ..., `"UID#"`, ..., `"ScannerMode"`).
 - **Next Tasks / Unfinished Work:** Begin Phase 5 — implement `sc-server` (Axum HTTP REST + WebSocket `/ws` + embedded `static/` UI) and wire `serve` subcommand into `scanner-controller`.
+
+### 2026-11-08 16:22 | Claude Opus 4.6 (Windows Dev)
+- **Phase:** Phase 5 — `sc-server` & Headless Daemon (`scanner-controller serve`)
+- **Work Performed:**
+  - Extended [`tools/gen_fixtures.py`](tools/gen_fixtures.py) to generate Phase 5 API contract fixtures (`rust/fixtures/api/initial_state.json` and `rust/fixtures/api/models_catalog.json`) from Python's `AppConfig`, `ScannerStatus`, and `UNIDEN_MODEL_CATALOG`.
+  - Updated [`rust/crates/sc-core/src/config.rs`](rust/crates/sc-core/src/config.rs) (`AppConfig::save_to_file`, `audio_device_name`/`output_device_name` with `#[serde(default, skip_serializing_if = "Option::is_none")]`, and `AppConfig::default()` parity with `config.py`).
+  - Updated [`rust/crates/sc-discovery/src/lib.rs`](rust/crates/sc-discovery/src/lib.rs) with `AvailablePortInfo` and `list_available_ports()`.
+  - Created [`rust/crates/sc-server/src/lib.rs`](rust/crates/sc-server/src/lib.rs):
+    - Embedded [`static/`](static/) into the single binary via `rust-embed` (`GET /`, `GET /favicon.ico`, `GET /static/*path`).
+    - Implemented all 15 REST and WebSocket endpoints matching [`server.py`](server.py): `GET /api/state`, `POST /api/config`, `POST /api/scanner/:scanner_id/model`, `POST /api/skip/:scanner_id`, `GET /api/audio/devices`, `GET /api/audio/output_devices`, `GET /api/ports/available`, `GET /api/ports/detect`, `GET /api/scanners/discover_lan`, `GET /api/models/catalog`, `POST /api/feeder/config`, `POST /api/feeder/dispatch_test`, and `GET /ws`.
+    - Implemented automatic `.bak` backup of `config.json` before the first save (`save_config_if_configured`) and automatic enrichment of `audio_device_name`/`output_device_name` next to indices.
+    - Added contract tests (`test_api_contract_fixtures_parity`, `test_static_ui_and_mutation_endpoints`).
+  - Updated [`rust/bins/scanner-controller/src/main.rs`](rust/bins/scanner-controller/src/main.rs) with `serve` subcommand (and default no-args behavior) to start the Axum server, handle `Ctrl+C` via `CancellationToken`, and open the browser unless `--no-browser` is passed.
+- **Intentional Behaviour Deviations from Python:**
+  - `POST /api/config`, `POST /api/scanner/:id/model`, and `POST /api/feeder/config` enrich `config.json` with `audio_device_name` / `output_device_name` and create `config.json.bak` on first write (per `Plan/phase_7_packaging_and_cutover.md` §2).
+- **Live Capture Impact:** None (not hardware-tested; existing serial ports and `config.json` untouched).
+- **Verification Performed:**
+  - `cargo fmt --all -- --check`: passed
+  - `cargo clippy --workspace --all-targets -- -D warnings`: passed (0 warnings)
+  - `cargo test --workspace`: 39 passed, 0 failed (`sc-server`: 2 passed, `sc-engine`: 3 passed, `sc-feeder`: 3 passed, `sc-audio`: 9 passed, `sc-core`: 6 passed, `sc-discovery`: 5 passed, `sc-drivers`: 6 passed, `sc-metadata`: 5 passed)
+  - `cargo check --workspace --target aarch64-unknown-linux-gnu`: passed
+  - Not hardware-tested (7-day live Pi shadow run remains an operational task).
+- **Gotchas / Warnings for Next Model:**
+  - In Phase 6, `static/` will be enhanced with all missing `gui.py` controls while maintaining 100% compatibility with Python's `server.py`.
+- **Next Tasks / Unfinished Work:** Execute Phase 6 (`sc-desktop` + `gui.py` feature parity in `static/`) and Phase 7 (packaging, `xtask`, deployment scripts, and release binary).

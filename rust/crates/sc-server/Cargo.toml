@@ -1,0 +1,33 @@
+[package]
+name = "sc-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+sc-core = { path = "../sc-core" }
+sc-drivers = { path = "../sc-drivers" }
+sc-discovery = { path = "../sc-discovery" }
+sc-audio = { path = "../sc-audio" }
+sc-feeder = { path = "../sc-feeder" }
+sc-engine = { path = "../sc-engine" }
+axum.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+rust-embed.workspace = true
+mime_guess.workspace = true
+futures-util.workspace = true
+
+[dev-dependencies]
+tower.workspace = true
+http-body-util.workspace = true
+

@@ -14,9 +14,15 @@ sc-core = { path = "../../crates/sc-core" }
 sc-metadata = { path = "../../crates/sc-metadata" }
 sc-drivers = { path = "../../crates/sc-drivers" }
 sc-discovery = { path = "../../crates/sc-discovery" }
+sc-audio = { path = "../../crates/sc-audio" }
+sc-feeder = { path = "../../crates/sc-feeder" }
+sc-engine = { path = "../../crates/sc-engine" }
+sc-server = { path = "../../crates/sc-server" }
 anyhow = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 serde_json = { workspace = true }
 serialport = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }

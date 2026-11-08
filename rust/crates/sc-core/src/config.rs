@@ -33,7 +33,7 @@ pub struct ScannerConfig {
     pub lockout_method: LockoutMethod,
     #[serde(default)]
     pub audio_device_index: Option<u32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio_device_name: Option<String>,
     #[serde(default)]
     pub audio_channel: AudioChannelMode,
@@ -106,7 +106,7 @@ pub struct ScanScribeFeederConfig {
     pub audio_format: String,
     #[serde(default)]
     pub audio_device_index: Option<u32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio_device_name: Option<String>,
     #[serde(default = "default_sample_rate")]
     pub sample_rate: u32,
@@ -227,15 +227,15 @@ pub struct AudioLoopbackConfig {
     pub enabled: bool,
     #[serde(default)]
     pub output_device_index: Option<u32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_device_name: Option<String>,
     #[serde(default = "default_volume")]
-    pub volume: f32,
+    pub volume: f64,
     #[serde(default = "default_pan_mode")]
     pub pan_mode: String,
 }
 
-const fn default_volume() -> f32 {
+const fn default_volume() -> f64 {
     0.8
 }
 
@@ -299,13 +299,13 @@ impl Default for AppConfig {
                 baud_rate: 115_200,
                 ip_host: "127.0.0.1".to_string(),
                 ip_port: 5000,
-                enabled: false,
+                enabled: true,
                 poll_interval_ms: 150,
                 lockout_method: LockoutMethod::Keypress,
                 audio_device_index: None,
                 audio_device_name: None,
                 audio_channel: AudioChannelMode::Right,
-                audio_enabled: false,
+                audio_enabled: true,
                 filename_template: Some("%DT - %S - %C (%TG)".to_string()),
                 tit2_template: Some("%C (%TG)".to_string()),
             },
@@ -345,6 +345,18 @@ impl AppConfig {
     pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self, ConfigError> {
         let content = std::fs::read_to_string(path)?;
         Self::from_json_str(&content)
+    }
+
+    /// Saves `AppConfig` as formatted JSON to a file on disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfigError`] if validation, serialization, or file write fails.
+    pub fn save_to_file(&self, path: impl AsRef<Path>) -> Result<(), ConfigError> {
+        self.validate()?;
+        let content = self.to_json_string()?;
+        std::fs::write(path, content)?;
+        Ok(())
     }
 
     /// Validates all sub-configurations.

@@ -568,6 +568,7 @@ impl<T: Transport + 'static> SyncManager<T> {
             }
         });
 
+        #[allow(clippy::cast_possible_truncation)]
         let mut recorder = ScannerAudioRecorder::new(
             config.feeder.sample_rate,
             config.sync.hang_time_seconds,
@@ -576,7 +577,7 @@ impl<T: Transport + 'static> SyncManager<T> {
             config.audio_loopback.output_device_index,
             config.audio_loopback.output_device_name.clone(),
             config.audio_loopback.enabled,
-            config.audio_loopback.volume,
+            config.audio_loopback.volume as f32,
             &config.audio_loopback.pan_mode,
         );
         Self::apply_audio_stream_config(&mut recorder, &config);
@@ -631,11 +632,12 @@ impl<T: Transport + 'static> SyncManager<T> {
         );
         recorder.mute_scanner("scanner_b", !enabled_b);
 
+        #[allow(clippy::cast_possible_truncation)]
         recorder.configure_loopback(
             config.audio_loopback.output_device_index,
             config.audio_loopback.output_device_name.clone(),
             config.audio_loopback.enabled,
-            config.audio_loopback.volume,
+            config.audio_loopback.volume as f32,
             &config.audio_loopback.pan_mode,
         );
         recorder.set_recording_enabled(config.feeder.enable_feeder);
@@ -730,11 +732,12 @@ impl<T: Transport + 'static> SyncManager<T> {
         }
         if let Ok(mut rec) = self.audio_recorder.lock() {
             rec.hang_time_seconds = new_config.sync.hang_time_seconds;
+            #[allow(clippy::cast_possible_truncation)]
             rec.configure_loopback(
                 new_config.audio_loopback.output_device_index,
                 new_config.audio_loopback.output_device_name.clone(),
                 new_config.audio_loopback.enabled,
-                new_config.audio_loopback.volume,
+                new_config.audio_loopback.volume as f32,
                 &new_config.audio_loopback.pan_mode,
             );
             rec.set_recording_enabled(new_config.feeder.enable_feeder);

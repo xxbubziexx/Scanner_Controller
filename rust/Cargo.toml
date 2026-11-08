@@ -8,6 +8,7 @@ members = [
     "crates/sc-audio",
     "crates/sc-feeder",
     "crates/sc-engine",
+    "crates/sc-server",
     "bins/scanner-controller",
     "xtask",
 ]
@@ -50,5 +51,12 @@ mp3lame-encoder = "0.2"
 tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "sync", "time", "net", "signal"] }
 tokio-util = "0.7"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart"] }
+axum = { version = "0.7", features = ["ws", "json"] }
+rust-embed = "8.5"
+mime_guess = "2.0"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+futures-util = "0.3"
+
 
 

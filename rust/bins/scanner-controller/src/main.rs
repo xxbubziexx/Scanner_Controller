@@ -1,21 +1,26 @@
-//! `scanner-controller` CLI binary.
+//! `scanner-controller` CLI and headless/web server binary.
 //!
-//! Phase 2 subcommands:
+//! Subcommands:
+//! - `scanner-controller` / `scanner-controller serve`: Starts the Mutual Exclusion Engine + Web Dashboard (`http://127.0.0.1:8000`).
 //! - `scanner-controller detect`: Probes serial COM/TTY ports and optional LAN UDP scanners.
-//! - `scanner-controller probe-keypad`: Tests raw `KEY` commands against a connected Uniden scanner
-//!   (direct Rust port of `tools/probe_keypad.py`).
+//! - `scanner-controller probe-keypad`: Tests raw `KEY` commands against a connected Uniden scanner.
 
 #![deny(unsafe_code)]
 
 use std::io::{Read, Write};
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use sc_core::AppConfig;
 use sc_discovery::{detect_serial_ports, discover_lan_scanners};
 use sc_drivers::normalize_port_name;
+use sc_server::run_hardware_server;
 use serialport::ClearBuffer;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -25,11 +30,30 @@ use serialport::ClearBuffer;
 )]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    /// Start the live Scanner Sync Engine and Web Control Dashboard (default when no subcommand is given).
+    Serve {
+        /// Host address to bind (e.g. 127.0.0.1 or 0.0.0.0).
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+
+        /// TCP port for the web dashboard and REST/WebSocket API.
+        #[arg(long, default_value_t = 8000)]
+        port: u16,
+
+        /// Path to config.json (defaults to ./config.json or ../config.json).
+        #[arg(long)]
+        config: Option<PathBuf>,
+
+        /// Do not automatically open the web browser on startup.
+        #[arg(long)]
+        no_browser: bool,
+    },
+
     /// Probe serial COM/TTY ports (and optionally UDP LAN) for connected Uniden scanners.
     Detect {
         /// Also broadcast UDP discovery on port 50536 for network-attached scanners (SDS200, BCD536HP).
@@ -76,6 +100,83 @@ enum Commands {
         )]
         keys: Vec<String>,
     },
+}
+
+fn resolve_config_path(explicit: Option<PathBuf>) -> PathBuf {
+    if let Some(p) = explicit {
+        return p;
+    }
+    let cwd_cfg = PathBuf::from("config.json");
+    if cwd_cfg.exists() {
+        return cwd_cfg;
+    }
+    let parent_cfg = Path::new("..").join("config.json");
+    if parent_cfg.exists() {
+        return parent_cfg;
+    }
+    cwd_cfg
+}
+
+fn try_open_browser(url: &str) {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("cmd")
+            .args(["/C", "start", "", url])
+            .spawn();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(url).spawn();
+    }
+}
+
+#[allow(clippy::print_stdout)]
+async fn run_serve(
+    host: &str,
+    port: u16,
+    explicit_cfg: Option<PathBuf>,
+    no_browser: bool,
+) -> Result<()> {
+    let cfg_path = resolve_config_path(explicit_cfg);
+    let config = if cfg_path.exists() {
+        tracing::info!(path = %cfg_path.display(), "Loading configuration from disk");
+        AppConfig::load_from_file(&cfg_path).unwrap_or_else(|err| {
+            tracing::warn!(error = %err, "Failed to parse config.json; using defaults");
+            AppConfig::default()
+        })
+    } else {
+        tracing::info!("No config.json found; starting with default configuration");
+        AppConfig::default()
+    };
+
+    let addr: SocketAddr = format!("{host}:{port}")
+        .parse()
+        .with_context(|| format!("Invalid bind address {host}:{port}"))?;
+
+    let shutdown_token = CancellationToken::new();
+    let signal_token = shutdown_token.clone();
+    tokio::spawn(async move {
+        if tokio::signal::ctrl_c().await.is_ok() {
+            tracing::info!("Ctrl+C received; initiating graceful shutdown...");
+            signal_token.cancel();
+        }
+    });
+
+    if !no_browser {
+        let browser_host = if host == "0.0.0.0" { "127.0.0.1" } else { host };
+        let url = format!("http://{browser_host}:{port}");
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(800));
+            try_open_browser(&url);
+        });
+    }
+
+    run_hardware_server(config, Some(cfg_path), addr, shutdown_token).await?;
+    Ok(())
 }
 
 #[allow(clippy::print_stdout)]
@@ -190,7 +291,8 @@ fn run_probe_keypad(raw_port: &str, baud: u32, keys: &[String]) -> Result<()> {
     Ok(())
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -200,11 +302,18 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
     match cli.command {
-        Commands::Detect {
+        None => run_serve("127.0.0.1", 8000, None, false).await,
+        Some(Commands::Serve {
+            host,
+            port,
+            config,
+            no_browser,
+        }) => run_serve(&host, port, config, no_browser).await,
+        Some(Commands::Detect {
             lan,
             active_ports,
             json,
-        } => run_detect(lan, &active_ports, json),
-        Commands::ProbeKeypad { port, baud, keys } => run_probe_keypad(&port, baud, &keys),
+        }) => run_detect(lan, &active_ports, json),
+        Some(Commands::ProbeKeypad { port, baud, keys }) => run_probe_keypad(&port, baud, &keys),
     }
 }

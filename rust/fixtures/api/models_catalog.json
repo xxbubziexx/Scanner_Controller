@@ -1,0 +1,338 @@
+{
+  "status": "success",
+  "models": [
+    {
+      "model": "BCD436HP",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BCD996P2",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BCD536HP",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "SDS100",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "SDS200",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BCD325P2",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BCD996XT",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BCD396XT",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BCT15X",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BCT15",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BC346XT",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BC346XTC",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BR330T",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BCD396T",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BCD996T",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BC250D",
+      "allowed_baud_rates": [
+        19200,
+        9600,
+        4800,
+        2400
+      ]
+    },
+    {
+      "model": "BC296D",
+      "allowed_baud_rates": [
+        57600,
+        38400,
+        19200,
+        9600,
+        4800,
+        2400
+      ]
+    },
+    {
+      "model": "BC780XLT",
+      "allowed_baud_rates": [
+        19200,
+        9600,
+        4800,
+        2400
+      ]
+    },
+    {
+      "model": "BC785D",
+      "allowed_baud_rates": [
+        19200,
+        9600,
+        4800,
+        2400
+      ]
+    },
+    {
+      "model": "BC796D",
+      "allowed_baud_rates": [
+        57600,
+        38400,
+        19200,
+        9600,
+        4800,
+        2400
+      ]
+    },
+    {
+      "model": "SDS150",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "SDS100E",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "SDS200E",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "USDS100",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "UBCD3600XLT",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "BCD160DN",
+      "allowed_baud_rates": [
+        115200
+      ]
+    },
+    {
+      "model": "BCD260DN",
+      "allowed_baud_rates": [
+        115200
+      ]
+    },
+    {
+      "model": "BC125AT",
+      "allowed_baud_rates": [
+        115200
+      ]
+    },
+    {
+      "model": "UBCD160DN",
+      "allowed_baud_rates": [
+        115200
+      ]
+    },
+    {
+      "model": "UBCD260DN",
+      "allowed_baud_rates": [
+        115200
+      ]
+    },
+    {
+      "model": "UBCD436PT",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "UBCD536PT",
+      "allowed_baud_rates": [
+        115200,
+        57600,
+        38400,
+        19200,
+        9600,
+        4800
+      ]
+    },
+    {
+      "model": "UBC125XLT",
+      "allowed_baud_rates": [
+        115200
+      ]
+    },
+    {
+      "model": "UBC126AT",
+      "allowed_baud_rates": [
+        115200
+      ]
+    }
+  ]
+}

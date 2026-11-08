@@ -561,6 +561,44 @@ def copy_proscan_samples():
     print(f"[OK] Copied {copied} ProScan sample files into {samples_dir}")
 
 
+def generate_api_fixtures():
+    from config import AppConfig, ScannerModel, get_allowed_baud_rates
+    from drivers.base_driver import ScannerStatus
+
+    api_dir = os.path.join(FIXTURES_DIR, "api")
+    os.makedirs(api_dir, exist_ok=True)
+
+    catalog = []
+    for m in ScannerModel:
+        catalog.append({
+            "model": m.value,
+            "allowed_baud_rates": get_allowed_baud_rates(m)
+        })
+    models_resp = {"status": "success", "models": catalog}
+    with open(os.path.join(api_dir, "models_catalog.json"), "w", encoding="utf-8") as f:
+        json.dump(models_resp, f, indent=2)
+
+    cfg = AppConfig()
+    st_a = ScannerStatus("scanner_a", cfg.scanner_a.name, cfg.scanner_a.model.value)
+    st_b = ScannerStatus("scanner_b", cfg.scanner_b.name, cfg.scanner_b.model.value)
+    initial_state = {
+        "scanner_a": st_a.to_dict(),
+        "scanner_b": st_b.to_dict(),
+        "config": cfg.model_dump(),
+        "active_exclusions": {},
+        "event_log": [],
+        "audio_levels": {
+            "scanner_a": 0,
+            "scanner_b": 0
+        },
+        "audio_level": 0
+    }
+    with open(os.path.join(api_dir, "initial_state.json"), "w", encoding="utf-8") as f:
+        json.dump(initial_state, f, indent=2)
+
+    print(f"[OK] Generated API contract fixtures in {api_dir}")
+
+
 def main():
     print("=== Generating Golden Test Fixtures for Rust Workspace ===")
     os.makedirs(FIXTURES_DIR, exist_ok=True)
@@ -569,6 +607,7 @@ def main():
     generate_driver_fixtures()
     generate_audio_fixtures()
     generate_feeder_fixtures()
+    generate_api_fixtures()
     copy_proscan_samples()
     print("=== All Fixtures Generated Successfully ===")
 
