@@ -30,7 +30,7 @@ use tokio_util::sync::CancellationToken;
 
 /// Embedded web UI assets from the repository `static/` directory (`Plan/phase_5_server_and_shadow_run.md` §3).
 #[derive(RustEmbed)]
-#[folder = "../../../static"]
+#[folder = "../../static"]
 pub struct StaticAssets;
 
 /// Errors returned by `sc-server`.

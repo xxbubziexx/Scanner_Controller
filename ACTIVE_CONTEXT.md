@@ -285,3 +285,28 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - When building native release binaries on Windows (`cargo build --release`), ensure `DOCS_RS` is not set in the environment (`Remove-Item Env:\DOCS_RS`), because `mp3lame-sys` skips compiling `libmp3lame` when `DOCS_RS` is set. Use `DOCS_RS=1` only for `cargo check --target aarch64-unknown-linux-gnu` when a Linux sysroot C compiler is not installed on Windows.
 - **Next Tasks / Unfinished Work:** All 8 code migration phases (P0–P7) are complete and verified. Remaining operational items are the 7-day shadow run on the live Pi (Phase 5 §4) and 14-day production soak before retiring the Python files into `legacy/` (Phase 7 §4).
+
+### 2026-11-15 14:30 | Gemini 2.5 Flash / Antigravity (Windows Dev Workstation)
+- **Phase:** Repository Restructuring — Rust Root Promotion on `rust` Branch
+- **Work Performed:**
+  - Removed legacy Python runtime files (`audio/`, `discovery/`, `drivers/`, `engine/`, `feeder/`, `metadata/`, `tests/`, `server.py`, `gui.py`, `config.py`) from the `rust` branch.
+  - Promoted the nested `rust/` workspace to the repository root:
+    - Moved `Cargo.toml`, `Cargo.lock`, `bins/`, `crates/`, `fixtures/`, `xtask/`, and `tools/pkg-config-cross.bat` directly into the repository root.
+    - Removed redundant `rust/` directory and merged `.gitignore` rules (`target/`).
+  - Updated relative path references:
+    - [`crates/sc-server/src/lib.rs`](crates/sc-server/src/lib.rs): changed embedded static folder path from `../../../static` to `../../static`.
+    - [`crates/sc-core/src/lib.rs`](crates/sc-core/src/lib.rs): changed root `config.json` path from `/../../../config.json` to `/../../config.json`.
+    - [`xtask/src/main.rs`](xtask/src/main.rs): updated `run_package` to treat `ws_root` directly as `repo_root`.
+    - [`run_rust_app.bat`](run_rust_app.bat): updated target release binary path and removed obsolete `pushd rust`.
+    - [`Dockerfile`](Dockerfile): updated multi-stage build paths to copy root workspace directly.
+    - [`install.sh`](install.sh): updated cargo build and binary paths to source from root.
+    - [`.github/workflows/rust_ci.yml`](.github/workflows/rust_ci.yml): removed `working-directory: rust` across jobs and included `rust` branch in triggers.
+- **Intentional Behaviour Deviations from Python:** None. Layout reorganization on `rust` branch only.
+- **Live Capture Impact:** None.
+- **Verification Performed:**
+  - `cargo fmt --all -- --check`: clean (0 diffs).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+  - `cargo test --workspace`: all 41 unit/integration/proptest tests passed.
+- **Gotchas / Warnings for Next Model:**
+  - The repository root on branch `rust` is now a standard Rust Cargo workspace root. All `cargo` and `xtask` commands are executed directly in the repository root without navigating to `rust/`.
+- **Next Tasks / Unfinished Work:** Verify test suite and push changes to `origin/rust`.

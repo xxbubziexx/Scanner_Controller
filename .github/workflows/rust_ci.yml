@@ -2,15 +2,9 @@ name: Rust CI
 
 on:
   push:
-    branches: [ main ]
-    paths:
-      - 'rust/**'
-      - '.github/workflows/rust_ci.yml'
+    branches: [ main, rust ]
   pull_request:
-    branches: [ main ]
-    paths:
-      - 'rust/**'
-      - '.github/workflows/rust_ci.yml'
+    branches: [ main, rust ]
 
 jobs:
   check-format:
@@ -22,7 +16,6 @@ jobs:
         with:
           components: rustfmt
       - name: Check Formatting
-        working-directory: rust
         run: cargo fmt --all -- --check
 
   clippy-and-test:
@@ -41,10 +34,8 @@ jobs:
         with:
           components: clippy
       - name: Clippy Lints
-        working-directory: rust
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Cargo Test
-        working-directory: rust
         run: cargo test --workspace
 
   aarch64-check:
@@ -58,7 +49,6 @@ jobs:
         with:
           targets: aarch64-unknown-linux-gnu
       - name: Cross-check Raspberry Pi compilation
-        working-directory: rust
         env:
           PKG_CONFIG_ALLOW_CROSS: "1"
           DOCS_RS: "1"

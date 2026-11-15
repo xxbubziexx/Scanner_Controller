@@ -111,7 +111,7 @@ fn run_build_release(ws_root: &Path, target: Option<&str>) -> Result<PathBuf> {
 
 fn run_package(ws_root: &Path, target: Option<&str>) -> Result<()> {
     let bin_path = run_build_release(ws_root, target)?;
-    let repo_root = ws_root.parent().unwrap_or(ws_root);
+    let repo_root = ws_root;
     let dist_dir = repo_root.join("dist");
     fs::create_dir_all(&dist_dir).context("Failed to create dist/ directory")?;
 

@@ -11,11 +11,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-COPY rust/ ./rust/
+COPY Cargo.toml Cargo.lock ./
+COPY bins/ ./bins/
+COPY crates/ ./crates/
+COPY fixtures/ ./fixtures/
 COPY static/ ./static/
 COPY config.json* ./
 
-WORKDIR /src/rust
 RUN cargo build --release --bin scanner-controller
 
 # ============================================================================
@@ -30,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY --from=builder /src/rust/target/release/scanner-controller /usr/local/bin/scanner-controller
+COPY --from=builder /src/target/release/scanner-controller /usr/local/bin/scanner-controller
 COPY static/ /app/static/
 
 RUN mkdir -p /var/scanscribe/inbox /app/recordings

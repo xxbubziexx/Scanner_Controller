@@ -42,7 +42,7 @@ mod tests {
     #[test]
     fn test_load_real_production_config_json() {
         // Read the actual config.json from repository root
-        let config_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../config.json");
+        let config_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../config.json");
         let content =
             std::fs::read_to_string(config_path).expect("Failed to read root config.json");
 

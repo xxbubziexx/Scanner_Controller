@@ -323,7 +323,7 @@ if [[ "$TARGET_DIR" != "$SOURCE_DIR" ]]; then
             --exclude=".git" \
             --exclude="__pycache__" \
             --exclude="*.pyc" \
-            --exclude="rust/target" \
+            --exclude="target" \
             --exclude="config.json" \
             --exclude="recordings" \
             "$SOURCE_DIR/" "$TARGET_DIR/"
@@ -353,14 +353,14 @@ if [[ -f "${SOURCE_DIR}/dist/scanner-controller" ]]; then
     echo -e "${GREEN}Installing prebuilt binary from ${SOURCE_DIR}/dist/scanner-controller...${NC}"
     run_as_root cp "${SOURCE_DIR}/dist/scanner-controller" "$RUST_BIN"
     run_as_root chmod 755 "$RUST_BIN"
-elif [[ -f "${SOURCE_DIR}/rust/target/release/scanner-controller" ]]; then
-    echo -e "${GREEN}Installing release binary from ${SOURCE_DIR}/rust/target/release/scanner-controller...${NC}"
-    run_as_root cp "${SOURCE_DIR}/rust/target/release/scanner-controller" "$RUST_BIN"
+elif [[ -f "${SOURCE_DIR}/target/release/scanner-controller" ]]; then
+    echo -e "${GREEN}Installing release binary from ${SOURCE_DIR}/target/release/scanner-controller...${NC}"
+    run_as_root cp "${SOURCE_DIR}/target/release/scanner-controller" "$RUST_BIN"
     run_as_root chmod 755 "$RUST_BIN"
-elif command -v cargo &>/dev/null && [[ -d "${SOURCE_DIR}/rust" ]]; then
+elif command -v cargo &>/dev/null && [[ -f "${SOURCE_DIR}/Cargo.toml" ]]; then
     echo -e "${CYAN}Building release binary from source via Cargo...${NC}"
-    (cd "${SOURCE_DIR}/rust" && run_as_target_user cargo build --release --bin scanner-controller)
-    run_as_root cp "${SOURCE_DIR}/rust/target/release/scanner-controller" "$RUST_BIN"
+    (cd "${SOURCE_DIR}" && run_as_target_user cargo build --release --bin scanner-controller)
+    run_as_root cp "${SOURCE_DIR}/target/release/scanner-controller" "$RUST_BIN"
     run_as_root chmod 755 "$RUST_BIN"
 else
     echo -e "${YELLOW}[WARNING] No prebuilt scanner-controller binary or cargo toolchain found.${NC}"
