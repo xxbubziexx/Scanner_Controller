@@ -1,1 +1,0 @@
-# ProScan Recording Metadata Package
