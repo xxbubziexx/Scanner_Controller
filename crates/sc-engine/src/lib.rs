@@ -2,7 +2,7 @@
 //! and bounded async `ScanScribe` dispatch worker pool.
 //!
 //! Ported from [`engine/sync_manager.py`](../../../../engine/sync_manager.py) and
-//! [`Plan/phase_4_engine_and_feeder.md`](../../../../Plan/phase_4_engine_and_feeder.md).
+//! [`Plan/phase_4_engine_and_feeder.md`](../../../Plan/phase_4_engine_and_feeder.md).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};

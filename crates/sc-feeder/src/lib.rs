@@ -1,7 +1,7 @@
 //! `ScanScribe` transcription pipeline feeder (`DIRECTORY_DROP` and `HTTP_WEBHOOK`).
 //!
 //! Ported from [`feeder/scanscribe_feeder.py`](../../../../feeder/scanscribe_feeder.py) and
-//! [`Plan/phase_4_engine_and_feeder.md`](../../../../Plan/phase_4_engine_and_feeder.md) §2.
+//! [`Plan/phase_4_engine_and_feeder.md`](../../../Plan/phase_4_engine_and_feeder.md) §2.
 //! Enforces Prime Directive 1 ("Never lose a call") via atomic temp-file rename and
 //! automatic fallback directory archival when primary inbox or webhook fails.
 

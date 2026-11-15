@@ -1,8 +1,8 @@
 //! Real-time audio capture, `PreRollRingBuffer`, `ProScan` VOX, resampling, loopback mixer,
 //! and WAV/MP3 encoders for `Scanner_Controller`.
 //!
-//! Ported from [`AUDIO-IO-PIPELINE.md`](../../../../AUDIO-IO-PIPELINE.md),
-//! [`VOX-ALGORITHM.md`](../../../../VOX-ALGORITHM.md), [`audio/recorder.py`](../../../../audio/recorder.py),
+//! Ported from [`AUDIO-IO-PIPELINE.md`](../../../docs/AUDIO-IO-PIPELINE.md),
+//! [`VOX-ALGORITHM.md`](../../../docs/VOX-ALGORITHM.md), [`audio/recorder.py`](../../../../audio/recorder.py),
 //! and [`feeder/scanscribe_feeder.py`](../../../../feeder/scanscribe_feeder.py).
 
 pub mod devices;

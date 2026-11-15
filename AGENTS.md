@@ -20,10 +20,10 @@ metadata. Those recordings go to the **ScanScribe** transcription pipeline.
    discarded. The only exception is the *intentional* duplicate-abort performed by mutual exclusion.
    Failed dispatches must be logged and retried or written to a fallback path.
 2. **Metadata is byte-exact.** The `pros` chunk, ID3v2.3 tag, RIFF `LIST`/`INFO` chunk, and `%` template
-   output must match [`RECORDING-METADATA-FORMAT.md`](RECORDING-METADATA-FORMAT.md) and
-   [`FORMATTERS-AND-FILENAME-SCHEME.md`](FORMATTERS-AND-FILENAME-SCHEME.md) byte for byte. ScanScribe and
+   output must match [`docs/RECORDING-METADATA-FORMAT.md`](docs/RECORDING-METADATA-FORMAT.md) and
+   [`docs/FORMATTERS-AND-FILENAME-SCHEME.md`](docs/FORMATTERS-AND-FILENAME-SCHEME.md) byte for byte. ScanScribe and
    ProScan-compatible tools rely on it.
-3. **The reverse-engineering docs are the spec.** The `*.md` docs in the repo root carry `file:line`
+3. **The reverse-engineering docs are the spec.** The `docs/*.md` docs carry `file:line`
    provenance from the decompiled ProScan binaries. When code and docs disagree, **stop and flag it**
    in `ACTIVE_CONTEXT.md`. Don't "fix" either one silently. Don't edit provenance lines without
    re-verifying them against the source.
@@ -120,5 +120,5 @@ Work is spread across models, sessions and machines, so shared memory lives in
 | `server.py`, `static/` | FastAPI backend + web UI (UI is reused by the Rust server) |
 | `gui.py` | CustomTkinter desktop GUI (to be replaced in Phase 6) |
 | `tests/` | Python pytest suite |
-| `*.md` (root) | Reverse-engineered ProScan specs (source of truth) |
+| `docs/*.md` | Reverse-engineered ProScan specs and command guides (source of truth) |
 | `install.sh`, `scanscribe-scanner.service`, `Dockerfile` | Deployment |

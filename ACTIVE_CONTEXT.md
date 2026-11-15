@@ -309,4 +309,26 @@ This living document is the **shared memory** between AI models, human developer
   - `cargo test --workspace`: all 41 unit/integration/proptest tests passed.
 - **Gotchas / Warnings for Next Model:**
   - The repository root on branch `rust` is now a standard Rust Cargo workspace root. All `cargo` and `xtask` commands are executed directly in the repository root without navigating to `rust/`.
-- **Next Tasks / Unfinished Work:** Verify test suite and push changes to `origin/rust`.
+### 2026-11-15 14:38 | Gemini 2.5 Flash / Antigravity (Windows Dev Workstation)
+- **Phase:** Documentation Consolidation — `docs/` Directory Organization
+- **Work Performed:**
+  - Consolidated all 9 reverse-engineering specifications and command reference markdown files from repository root into [`docs/`](docs/):
+    - `docs/AUDIO-IO-PIPELINE.md`
+    - `docs/COMMAND_GUIDE.md`
+    - `docs/COMPORT-AND-SCANNER-SELECTION.md`
+    - `docs/DMA-VS-HP-ARCHITECTURE.md`
+    - `docs/FORMATTERS-AND-FILENAME-SCHEME.md`
+    - `docs/KEYPAD-AND-DISPLAY.md`
+    - `docs/RECORDING-METADATA-FORMAT.md`
+    - `docs/SERIAL-POLLING-AND-LAN-AUDIO.md`
+    - `docs/VOX-ALGORITHM.md`
+  - Updated relative documentation links in [`README.md`](README.md), [`AGENTS.md`](AGENTS.md), [`crates/sc-audio/src/lib.rs`](crates/sc-audio/src/lib.rs), [`crates/sc-engine/src/lib.rs`](crates/sc-engine/src/lib.rs), and [`crates/sc-feeder/src/lib.rs`](crates/sc-feeder/src/lib.rs).
+- **Intentional Behaviour Deviations from Python:** None. Documentation reorganization only.
+- **Live Capture Impact:** None.
+- **Verification Performed:**
+  - `cargo fmt --all -- --check`: clean (0 diffs).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+  - `cargo test --workspace`: all 41 unit/integration/proptest tests passed.
+- **Gotchas / Warnings for Next Model:**
+  - Reverse-engineering specifications now reside in `docs/` rather than the repository root. `README.md`, `AGENTS.md`, and `ACTIVE_CONTEXT.md` remain at root.
+- **Next Tasks / Unfinished Work:** Pushed to `origin/rust`.

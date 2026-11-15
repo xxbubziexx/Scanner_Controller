@@ -120,13 +120,15 @@ python -m unittest discover tests
 ## Reverse Engineering Documentation
 
 Detailed reverse-engineered specifications from ProScan source are documented in:
-* [`KEYPAD-AND-DISPLAY.md`](KEYPAD-AND-DISPLAY.md): Wire protocols, knob rotation, keypad dialects.
-* [`FORMATTERS-AND-FILENAME-SCHEME.md`](FORMATTERS-AND-FILENAME-SCHEME.md): All 33 custom specifiers, sequential replacement ordering, naming rules.
-* [`RECORDING-METADATA-FORMAT.md`](RECORDING-METADATA-FORMAT.md): Custom binary RIFF `pros` chunk structure and ID3v2.3 tags.
-* [`AUDIO-IO-PIPELINE.md`](AUDIO-IO-PIPELINE.md): Dual-channel ring buffer, loopback monitor, and PortAudio architecture.
-* [`SERIAL-POLLING-AND-LAN-AUDIO.md`](SERIAL-POLLING-AND-LAN-AUDIO.md): Pipelined serial polling bursts (`MDL`, `STS`, `GLG`, `VOL`, `SQL`, `PWR`, `GSI`).
-* [`DMA-VS-HP-ARCHITECTURE.md`](DMA-VS-HP-ARCHITECTURE.md): Structural differences between DMA and HomePatrol scanner families.
-* [`VOX-ALGORITHM.md`](VOX-ALGORITHM.md): Audio squelch detection and hang timers.
+* [`docs/KEYPAD-AND-DISPLAY.md`](docs/KEYPAD-AND-DISPLAY.md): Wire protocols, knob rotation, keypad dialects.
+* [`docs/FORMATTERS-AND-FILENAME-SCHEME.md`](docs/FORMATTERS-AND-FILENAME-SCHEME.md): All 33 custom specifiers, sequential replacement ordering, naming rules.
+* [`docs/RECORDING-METADATA-FORMAT.md`](docs/RECORDING-METADATA-FORMAT.md): Custom binary RIFF `pros` chunk structure and ID3v2.3 tags.
+* [`docs/AUDIO-IO-PIPELINE.md`](docs/AUDIO-IO-PIPELINE.md): Dual-channel ring buffer, loopback monitor, and PortAudio architecture.
+* [`docs/SERIAL-POLLING-AND-LAN-AUDIO.md`](docs/SERIAL-POLLING-AND-LAN-AUDIO.md): Pipelined serial polling bursts (`MDL`, `STS`, `GLG`, `VOL`, `SQL`, `PWR`, `GSI`).
+* [`docs/DMA-VS-HP-ARCHITECTURE.md`](docs/DMA-VS-HP-ARCHITECTURE.md): Structural differences between DMA and HomePatrol scanner families.
+* [`docs/VOX-ALGORITHM.md`](docs/VOX-ALGORITHM.md): Audio squelch detection and hang timers.
+* [`docs/COMMAND_GUIDE.md`](docs/COMMAND_GUIDE.md): Complete CLI reference and command guide.
+* [`docs/COMPORT-AND-SCANNER-SELECTION.md`](docs/COMPORT-AND-SCANNER-SELECTION.md): COM port negotiation and scanner selection.
 
 ---
 
