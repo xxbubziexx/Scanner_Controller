@@ -11,3 +11,4 @@ for %%A in (%*) do (
 )
 echo -lasound
 exit /b 0
+
