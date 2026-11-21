@@ -368,4 +368,29 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - Never overwrite or delete untracked local/production `config.json`.
   - Under `cpal` 0.18 PulseAudio on Linux, saved legacy ALSA numeric indices without `audio_device_name`/`output_device_name` fall back to host default devices until saved from the Web UI.
-- **Next Tasks / Unfinished Work:** Commit and push to `origin/rust`, deploy and verify on VM 123 (`192.168.10.149`).
+- **Next Tasks / Unfinished Work:** Deployed and verified on VM 123 (see entry below).
+
+### 2026-11-21 13:19 | Claude / Antigravity (VM 123 Linux Deployment & Verification)
+- **Phase:** Rust Production Hardening — VM 123 Live Verification (`cd0c8bb`)
+- **Work Performed:**
+  - Pulled `origin/rust` (`cd0c8bb`) onto VM 123 (`/opt/scanner-controller`), preserving production `config.json` (and untouched existing `config.json.pre-index.bak`), cleaned up stale Windows test artifact directory (`crates/sc-feeder/Z:*`), compiled release binary, and restarted user service `scanscribe-scanner.service`.
+- **Intentional Behaviour Deviations from Python:** None beyond `cd0c8bb`.
+- **Live Capture Impact:** Upgraded live capture/loopback to pure-Rust `cpal` 0.18 `pulseaudio` client; two live transmissions on `BCD436HP` (`154.2125` `Fire: Main 1 (Response)`) recorded cleanly to `/var/scanscribe/inbox/` immediately after service restart while loopback streamed simultaneously to `Uniden_Sink` (`ffmpeg` monitor active).
+- **Verification Performed (VM 123 Linux `rustc 1.100.0`):**
+  - `cargo check --workspace --all-targets`: exit 0 (0 Rust compiler warnings; Cargo noted unused manifest deps `byteorder` in [`Cargo.toml`](Cargo.toml) and `thiserror` in [`crates/sc-metadata/Cargo.toml`](crates/sc-metadata/Cargo.toml)).
+  - `cargo test --workspace --no-fail-fast`: 45 passed, 0 failed (`sc-audio`: 9, `sc-core`: 7, `sc-desktop`: 2, `sc-discovery`: 6, `sc-drivers`: 7, `sc-engine`: 4, `sc-feeder`: 3, `sc-metadata`: 5, `sc-server`: 2).
+  - `cargo build --release --bin scanner-controller`: succeeded in `35.31s`.
+  - Live `scanscribe-scanner.service` telemetry (PID `129104`):
+    - Total process CPU dropped from >100% (`cpal_alsa_out` spin before deploy) to `6.1%` overall CPU (`0.3%` MEM / `13.7M` RSS; `top -H` per-thread snapshot showed highest thread at `3.0%` / `10.0%` during active MP3+loopback and remaining 14 threads at `0.0%`).
+    - `journalctl --user -u scanscribe-scanner`: zero `WARN`, `ERROR`, `ALSA`, or `JACK` lines after restart (`19:18:27 UTC`); clean PulseAudio connections to `Uniden_Sink` (`48000 Hz`, 2ch) and `Audio Adapter (Unitek Y-247A) Mono` (`44100 Hz`, 1ch).
+    - Live HTTP checks (`127.0.0.1:8000`):
+      - `GET /api/health`: `{"status":"healthy","uptime_seconds":68,...}` (`scanner_a` `BCD436HP` connected, `scanner_b` `DISABLED`).
+      - `GET /api/ports/available`: returns only `/dev/ttyACM1` (`detected_model: "BCD436HP"`); all 32 phantom `/dev/ttyS*` ports filtered.
+      - `GET /api/audio/devices` & `/api/audio/output_devices`: clean PulseAudio device lists with human-readable names.
+      - `GET /api/state`: `scanner_b` shows `status_line: "DISABLED"` with empty metadata fields.
+      - `GET /` & `/static/app.js`: return `cache-control: no-cache`, include `settings-tabs` and `cfg_output_dir`, and omit `34 Catalog` and `Pipeline Feeder`.
+- **Gotchas / Warnings for Next Model:**
+  - `cargo-clippy` component is not installed on VM 123's Linux toolchain (`rustup component add clippy` if needed on the VM).
+  - Unused manifest dependency warnings remain for workspace `byteorder` (`Cargo.toml`) and `thiserror` (`crates/sc-metadata/Cargo.toml`) on Linux builds.
+  - Note VM 123 production `config.json` currently uses PulseAudio defaults cleanly (`Audio Adapter (Unitek Y-247A) Mono` input and `Uniden_Sink` loopback output); opening Settings and clicking Save & Apply in the Web UI will persist explicit device names (`audio_device_name` / `output_device_name`).
+- **Next Tasks / Unfinished Work:** None; VM 123 production verification complete.
