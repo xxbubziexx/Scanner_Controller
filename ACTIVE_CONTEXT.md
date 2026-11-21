@@ -446,3 +446,17 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - `sc-server` embeds `static/` at compile time in `--release`, so VM 123 requires `cargo build --release --bin scanner-controller` after `git pull`.
 - **Next Tasks / Unfinished Work:** None.
+
+### 2026-11-21 14:27 | Claude / Antigravity (Windows Dev Workstation & VM 123 Deploy)
+- **Phase:** UI Stability Fix — Eliminate LCD Layout Bounce During Scanning
+- **Work Performed:**
+  - Updated `renderLcdMirror` in [`static/app.js`](static/app.js) to render every `display_lines` entry 1-to-1 as a fixed `.lcd-row` (using `\u00A0` for empty rows instead of skipping blank/divider rows) so System, Department, and Channel lines stay pinned in their physical hardware row positions while scanning.
+  - Locked vertical heights in [`static/style.css`](static/style.css): fixed `.lcd-mirror` and `.lcd-fallback` to `height: 284px`, fixed `.lcd-row` (`16px`) and `.lcd-row-large` (`20px`) row heights with `flex-shrink: 0`, locked `.lcd-meta-row` (`height: 30px`, `white-space: nowrap`), prevented header `.status-badge`/`.rec-badge`/`.badge-model` wrapping, and set `min-height: 40px` on `.active-holds-bar`.
+- **Intentional Behaviour Deviations from Python:** Pure CSS/DOM stability improvement for live LCD rendering.
+- **Live Capture Impact:** Brief service restart on VM 123 during release rebuild/deploy.
+- **Verification Performed:**
+  - Static check: zero characters with `ord >= 0x2600` across `static/index.html`, `static/app.js`, and `static/style.css`.
+  - Windows gate: `cargo fmt --all -- --check` clean, `cargo clippy --workspace --all-targets -- -D warnings` (0 warnings), `cargo test --workspace --no-fail-fast` (46 passed, 0 failed).
+- **Gotchas / Warnings for Next Model:**
+  - None.
+- **Next Tasks / Unfinished Work:** Deploy and verify live on VM 123.

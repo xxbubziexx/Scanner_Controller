@@ -446,23 +446,10 @@ function renderLcdMirror(containerEl, displayLines) {
   containerEl.dataset.lastLcdKey = key;
 
   const fragment = document.createDocumentFragment();
-  let lastWasDivider = true;
 
   for (const line of displayLines) {
     const text = typeof line.text === "string" ? line.text : "";
     const mode = typeof line.mode === "string" ? line.mode : "";
-    const hasText = text.trim().length > 0;
-    const hasModeHighlight = mode.includes("*") || mode.includes("#");
-
-    if (!hasText && !hasModeHighlight) {
-      if (line.underline_divider && !lastWasDivider) {
-        const divEl = document.createElement("div");
-        divEl.className = "lcd-divider";
-        fragment.appendChild(divEl);
-        lastWasDivider = true;
-      }
-      continue;
-    }
 
     const rowEl = document.createElement("div");
     rowEl.className = "lcd-row";
@@ -474,7 +461,8 @@ function renderLcdMirror(containerEl, displayLines) {
     }
 
     if (!mode) {
-      rowEl.textContent = text.trimEnd();
+      const clean = text.trimEnd();
+      rowEl.textContent = clean.length > 0 ? clean : "\u00A0";
     } else {
       let effectiveLen = Math.max(text.length, mode.length);
       while (effectiveLen > 0) {
@@ -487,44 +475,43 @@ function renderLcdMirror(containerEl, displayLines) {
         }
       }
 
-      let runText = "";
-      let runCls = null;
-      const flushRun = () => {
-        if (!runText) return;
-        if (runCls) {
-          const span = document.createElement("span");
-          span.className = runCls;
-          span.textContent = runText;
-          rowEl.appendChild(span);
-        } else {
-          rowEl.appendChild(document.createTextNode(runText));
-        }
-        runText = "";
-      };
+      if (effectiveLen === 0) {
+        rowEl.textContent = "\u00A0";
+      } else {
+        let runText = "";
+        let runCls = null;
+        const flushRun = () => {
+          if (!runText) return;
+          if (runCls) {
+            const span = document.createElement("span");
+            span.className = runCls;
+            span.textContent = runText;
+            rowEl.appendChild(span);
+          } else {
+            rowEl.appendChild(document.createTextNode(runText));
+          }
+          runText = "";
+        };
 
-      for (let i = 0; i < effectiveLen; i += 1) {
-        const ch = i < text.length ? text[i] : " ";
-        const m = i < mode.length ? mode[i] : " ";
-        let cls = "";
-        if (m === "*") cls = "lcd-inv";
-        else if (m === "#") cls = "lcd-inv-ul";
-        else if (m === "_") cls = "lcd-ul";
+        for (let i = 0; i < effectiveLen; i += 1) {
+          const ch = i < text.length ? text[i] : " ";
+          const m = i < mode.length ? mode[i] : " ";
+          let cls = "";
+          if (m === "*") cls = "lcd-inv";
+          else if (m === "#") cls = "lcd-inv-ul";
+          else if (m === "_") cls = "lcd-ul";
 
-        if (runCls !== null && cls !== runCls) {
-          flushRun();
+          if (runCls !== null && cls !== runCls) {
+            flushRun();
+          }
+          runCls = cls;
+          runText += ch;
         }
-        runCls = cls;
-        runText += ch;
+        flushRun();
       }
-      flushRun();
     }
 
     fragment.appendChild(rowEl);
-    lastWasDivider = Boolean(line.underline_divider);
-  }
-
-  if (fragment.lastChild && fragment.lastChild.classList && fragment.lastChild.classList.contains("lcd-divider")) {
-    fragment.removeChild(fragment.lastChild);
   }
 
   containerEl.replaceChildren(fragment);
