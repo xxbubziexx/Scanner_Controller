@@ -332,3 +332,21 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - Reverse-engineering specifications now reside in `docs/` rather than the repository root. `README.md`, `AGENTS.md`, and `ACTIVE_CONTEXT.md` remain at root.
 - **Next Tasks / Unfinished Work:** Pushed to `origin/rust`.
+
+### 2026-11-21 12:35 | Gemini 2.5 Flash / Antigravity (Windows Dev Workstation)
+- **Phase:** Rust Production Hardening (Post-Field Handoff)
+- **Work Performed:**
+  - Audited VM 123 field handoff report against the Rust codebase (`rust` branch).
+  - Confirmed architectural immunity in Rust for the critical Python defect: serial I/O runs in dedicated `tokio::task::spawn_blocking` worker threads and does not starve Axum HTTP serving.
+  - Implemented `GET /api/config` and `GET /api/health` endpoints in [`crates/sc-server/src/lib.rs`](crates/sc-server/src/lib.rs), enabling remote configuration reads and health auditing.
+  - Hardened disabled scanner handling in [`crates/sc-engine/src/lib.rs`](crates/sc-engine/src/lib.rs): when `enabled == false`, initial status and ongoing polling set `status_line = "DISABLED"`, skipping unnecessary hardware poll cycles. Added unit test `test_disabled_scanner_status_line_and_skip_polling`.
+  - Updated [`static/app.js`](static/app.js) to render disabled cards with dimmed opacity (`0.6`), hidden skip buttons, and `DISABLED` badges.
+- **Intentional Behaviour Deviations from Python:** None.
+- **Live Capture Impact:** None.
+- **Verification Performed:**
+  - `cargo fmt --all -- --check`: clean (0 diffs).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+  - `cargo test --workspace`: all 42 tests passed (`sc-audio`: 9, `sc-core`: 6, `sc-desktop`: 2, `sc-discovery`: 5, `sc-drivers`: 6, `sc-engine`: 4, `sc-feeder`: 3, `sc-metadata`: 5, `sc-server`: 2).
+- **Gotchas / Warnings for Next Model:**
+  - All development is locked to the Rust codebase (`rust` branch). Python is superseded by Rust.
+- **Next Tasks / Unfinished Work:** Commit and push to `origin/rust`.

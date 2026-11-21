@@ -114,8 +114,12 @@ pub fn build_router<T: Transport + Send + 'static>(state: Arc<ServerState<T>>) -
         .route("/", get(handle_root))
         .route("/favicon.ico", get(handle_favicon))
         .route("/static/*path", get(handle_static_asset))
+        .route("/api/health", get(handle_health_check::<T>))
         .route("/api/state", get(handle_get_state::<T>))
-        .route("/api/config", post(handle_update_config::<T>))
+        .route(
+            "/api/config",
+            get(handle_get_config::<T>).post(handle_update_config::<T>),
+        )
         .route(
             "/api/scanner/:scanner_id/model",
             post(handle_change_scanner_model::<T>),
@@ -192,6 +196,32 @@ async fn handle_get_state<T: Transport + Send + 'static>(
     let mgr = state.sync_manager.lock().await;
     let snapshot = mgr.get_full_state();
     Json(serde_json::to_value(snapshot).unwrap_or_else(|_| json!({})))
+}
+
+async fn handle_get_config<T: Transport + Send + 'static>(
+    State(state): State<Arc<ServerState<T>>>,
+) -> Json<AppConfig> {
+    let mgr = state.sync_manager.lock().await;
+    let full = mgr.get_full_state();
+    Json(full.config)
+}
+
+async fn handle_health_check<T: Transport + Send + 'static>(
+    State(state): State<Arc<ServerState<T>>>,
+) -> Json<Value> {
+    let mgr = state.sync_manager.lock().await;
+    let full = mgr.get_full_state();
+    Json(json!({
+        "status": "healthy",
+        "scanner_a": {
+            "connected": full.scanner_a.connected,
+            "status_line": full.scanner_a.status_line
+        },
+        "scanner_b": {
+            "connected": full.scanner_b.connected,
+            "status_line": full.scanner_b.status_line
+        }
+    }))
 }
 
 async fn handle_update_config<T: Transport + Send + 'static>(
@@ -750,7 +780,41 @@ mod tests {
             .unwrap();
         assert_eq!(fav_resp.status(), StatusCode::NO_CONTENT);
 
-        // 4. POST /api/scanner/scanner_a/model
+        // 4. GET /api/config -> 200 OK
+        let cfg_resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/config")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(cfg_resp.status(), StatusCode::OK);
+        let cfg_json: Value =
+            serde_json::from_slice(&cfg_resp.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(cfg_json["scanner_a"]["id"], "scanner_a");
+
+        // 5. GET /api/health -> 200 OK
+        let health_resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(health_resp.status(), StatusCode::OK);
+        let health_json: Value =
+            serde_json::from_slice(&health_resp.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(health_json["status"], "healthy");
+
+        // 6. POST /api/scanner/scanner_a/model
         let model_resp = app
             .oneshot(
                 Request::builder()

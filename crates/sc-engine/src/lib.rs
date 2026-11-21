@@ -518,7 +518,7 @@ impl<T: Transport + 'static> SyncManager<T> {
         driver_a: Option<AnyScannerDriver<T>>,
         driver_b: Option<AnyScannerDriver<T>>,
     ) -> Self {
-        let initial_status_a = driver_a.as_ref().map_or_else(
+        let mut initial_status_a = driver_a.as_ref().map_or_else(
             || {
                 ScannerStatus::new(
                     "scanner_a",
@@ -528,7 +528,12 @@ impl<T: Transport + 'static> SyncManager<T> {
             },
             |d| d.status().clone(),
         );
-        let initial_status_b = driver_b.as_ref().map_or_else(
+        if !config.scanner_a.enabled {
+            initial_status_a.status_line = "DISABLED".to_string();
+            initial_status_a.connected = false;
+        }
+
+        let mut initial_status_b = driver_b.as_ref().map_or_else(
             || {
                 ScannerStatus::new(
                     "scanner_b",
@@ -538,6 +543,10 @@ impl<T: Transport + 'static> SyncManager<T> {
             },
             |d| d.status().clone(),
         );
+        if !config.scanner_b.enabled {
+            initial_status_b.status_line = "DISABLED".to_string();
+            initial_status_b.connected = false;
+        }
 
         let mut sc_configs = HashMap::new();
         sc_configs.insert("scanner_a".to_string(), config.scanner_a.clone());
@@ -755,8 +764,16 @@ impl<T: Transport + 'static> SyncManager<T> {
     /// never discards the status or stalls mutual-exclusion/recording for the healthy scanner.
     #[must_use]
     pub fn poll_once_sync(&self, now: f64) -> EngineStateSnapshot {
-        // 1. Poll Scanner A independently
-        if let Ok(mut drv_a_guard) = self.scanner_a.lock() {
+        let cfg = self.config.lock().map(|c| c.clone()).unwrap_or_default();
+
+        // 1. Poll Scanner A independently if enabled
+        if !cfg.scanner_a.enabled {
+            if let Ok(mut sa) = self.status_a.lock() {
+                sa.connected = false;
+                sa.receiving = false;
+                sa.status_line = "DISABLED".to_string();
+            }
+        } else if let Ok(mut drv_a_guard) = self.scanner_a.lock() {
             if let Some(drv_a) = drv_a_guard.as_mut() {
                 let st_a = drv_a.poll().clone();
                 if let Ok(mut sa) = self.status_a.lock() {
@@ -765,8 +782,14 @@ impl<T: Transport + 'static> SyncManager<T> {
             }
         }
 
-        // 2. Poll Scanner B independently
-        if let Ok(mut drv_b_guard) = self.scanner_b.lock() {
+        // 2. Poll Scanner B independently if enabled
+        if !cfg.scanner_b.enabled {
+            if let Ok(mut sb) = self.status_b.lock() {
+                sb.connected = false;
+                sb.receiving = false;
+                sb.status_line = "DISABLED".to_string();
+            }
+        } else if let Ok(mut drv_b_guard) = self.scanner_b.lock() {
             if let Some(drv_b) = drv_b_guard.as_mut() {
                 let st_b = drv_b.poll().clone();
                 if let Ok(mut sb) = self.status_b.lock() {
@@ -774,8 +797,6 @@ impl<T: Transport + 'static> SyncManager<T> {
                 }
             }
         }
-
-        let cfg = self.config.lock().map(|c| c.clone()).unwrap_or_default();
         let sa = self.status_a.lock().map_or_else(
             |_| ScannerStatus::new("scanner_a", "Scanner A", "BCD436HP"),
             |s| s.clone(),
@@ -960,11 +981,21 @@ impl<T: Transport + 'static> SyncManager<T> {
                 tokio::select! {
                     () = token.cancelled() => break,
                     () = tokio::time::sleep(Duration::from_millis(poll_ms)) => {
+                        let (enabled_a, enabled_b) = cfg_arc
+                            .lock()
+                            .map_or((true, true), |c| (c.scanner_a.enabled, c.scanner_b.enabled));
+
                         // Poll Scanner A and Scanner B on independent blocking threads
                         let drv_a_c = Arc::clone(&scanner_a);
                         let st_a_c = Arc::clone(&status_a);
                         let task_a = tokio::task::spawn_blocking(move || {
-                            if let Ok(mut g) = drv_a_c.lock() {
+                            if !enabled_a {
+                                if let Ok(mut out) = st_a_c.lock() {
+                                    out.connected = false;
+                                    out.receiving = false;
+                                    out.status_line = "DISABLED".to_string();
+                                }
+                            } else if let Ok(mut g) = drv_a_c.lock() {
                                 if let Some(drv) = g.as_mut() {
                                     let s = drv.poll().clone();
                                     if let Ok(mut out) = st_a_c.lock() {
@@ -977,7 +1008,13 @@ impl<T: Transport + 'static> SyncManager<T> {
                         let drv_b_c = Arc::clone(&scanner_b);
                         let st_b_c = Arc::clone(&status_b);
                         let task_b = tokio::task::spawn_blocking(move || {
-                            if let Ok(mut g) = drv_b_c.lock() {
+                            if !enabled_b {
+                                if let Ok(mut out) = st_b_c.lock() {
+                                    out.connected = false;
+                                    out.receiving = false;
+                                    out.status_line = "DISABLED".to_string();
+                                }
+                            } else if let Ok(mut g) = drv_b_c.lock() {
                                 if let Some(drv) = g.as_mut() {
                                     let s = drv.poll().clone();
                                     if let Ok(mut out) = st_b_c.lock() {
@@ -1204,6 +1241,30 @@ mod tests {
         assert_eq!(snap.scanner_b.tgid.as_deref(), Some("20202"));
         // Verify Scanner B opened squelch and started recording normally despite Scanner A failing!
         assert!(engine.audio_recorder.lock().unwrap().streams["scanner_b"].has_active_session());
+    }
+
+    #[test]
+    fn test_disabled_scanner_status_line_and_skip_polling() {
+        let mut config = AppConfig::default();
+        config.scanner_b.enabled = false;
+
+        let transport_a = ReplayTransport::from_responses(vec![make_dma_active_transcript(
+            "10401",
+            "County P25",
+            "Fire",
+            "Fire Dispatch",
+        )]);
+        let transport_b = ReplayTransport::new_disconnected(false);
+
+        let driver_a = create_driver_for_model(config.scanner_a.clone(), transport_a);
+        let driver_b = create_driver_for_model(config.scanner_b.clone(), transport_b);
+
+        let engine = SyncManager::with_drivers(config, Some(driver_a), Some(driver_b));
+        let snap = engine.poll_once_sync(100.0);
+
+        assert!(snap.scanner_a.connected);
+        assert!(!snap.scanner_b.connected);
+        assert_eq!(snap.scanner_b.status_line, "DISABLED");
     }
 
     #[test]

@@ -501,13 +501,22 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
 
   if (!card) return;
 
-  sysEl.innerText = data.system_name || "Scanning...";
+  const isDisabled = data.status_line === "DISABLED" || scannerCfg.enabled === false;
+  const idleText = isDisabled ? "DISABLED" : (data.connected ? "Scanning..." : "DISCONNECTED");
+
+  sysEl.innerText = data.system_name || idleText;
   deptEl.innerText = data.dept_name || "";
-  chanEl.innerText = data.channel_name || "Scanning...";
+  chanEl.innerText = data.channel_name || idleText;
   tgidEl.innerText = data.tgid || "--";
   freqEl.innerText = data.frequency ? `${data.frequency.toFixed(4)} MHz` : "-- MHz";
   modEl.innerText = data.modulation || "NFM";
   if (uidEl) uidEl.innerText = data.unit_id || "--";
+
+  card.style.opacity = isDisabled ? "0.6" : "1";
+  const skipBtn = document.getElementById(`skipBtn${suffix}`);
+  if (skipBtn) {
+    skipBtn.style.display = isDisabled ? "none" : "";
+  }
 
   if (cardEnable && document.activeElement !== cardEnable) {
     cardEnable.checked = scannerCfg.enabled !== false;
@@ -548,7 +557,11 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
   }
 
   // State Badges
-  if (data.receiving) {
+  if (isDisabled) {
+    card.classList.remove("receiving");
+    badge.className = "status-badge scanning";
+    statusText.innerText = "DISABLED";
+  } else if (data.receiving) {
     card.classList.add("receiving");
     badge.className = "status-badge receiving";
     statusText.innerText = "RECEIVING AUDIO";
