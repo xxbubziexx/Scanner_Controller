@@ -411,4 +411,22 @@ This living document is the **shared memory** between AI models, human developer
   - `cargo test --workspace --no-fail-fast`: all 46 tests passed (`sc-audio`: 9, `sc-core`: 7, `sc-desktop`: 2, `sc-discovery`: 6, `sc-drivers`: 8, `sc-engine`: 4, `sc-feeder`: 3, `sc-metadata`: 5, `sc-server`: 2).
 - **Gotchas / Warnings for Next Model:**
   - `#[serde(default, skip_serializing_if = "Vec::is_empty")]` must stay on `ScannerStatus::display_lines` so disconnected initial state matches `fixtures/api/initial_state.json`.
-- **Next Tasks / Unfinished Work:** Push to `origin/rust`, deploy to VM 123, and verify live BCD436HP `display_lines` in `/api/state`.
+- **Next Tasks / Unfinished Work:** Deployed and verified live on VM 123 (see entry below).
+
+### 2026-11-21 13:57 | Claude / Antigravity (VM 123 Linux Live BCD436HP LCD Verification)
+- **Phase:** Feature Verification — ProScan-style Live LCD Mirror (`e00c38c`)
+- **Work Performed:**
+  - Deployed `e00c38c` to VM 123 (`/opt/scanner-controller`), ran Linux `cargo test --workspace --no-fail-fast`, rebuilt release binary, and restarted `scanscribe-scanner.service` (PID `146859`).
+- **Intentional Behaviour Deviations from Python:** Live Web UI mirrors physical scanner LCD screen rows via `STS` on `/api/state` and `/ws`.
+- **Live Capture Impact:** Positive; live BCD436HP capture, PulseAudio loopback, and `STS` LCD streaming running together cleanly at `5.2%` CPU (`7.3M` RAM).
+- **Verification Performed (VM 123 Linux `rustc 1.100.0`):**
+  - `cargo test --workspace --no-fail-fast`: 46 passed, 0 failed (`sc-drivers`: 8 including `test_sts_live_lcd_display_parsing`; all 9 crates passing).
+  - `cargo build --release --bin scanner-controller`: succeeded in `21.57s`.
+  - Live `GET /api/state` (sampled 1.1s apart on PID `146859`):
+    - `scanner_a.display_lines`: returned 14 live BCD436HP LCD rows (`F0:-12******9 13:57`, `S0:0*-------- Nov21`, `St. Francois`, `St. Francois County - Central Dispatch`, `Fire: Main 1 (Response)`, `  154.2125MHz    C203.5 `, `Fire Dispatch`, `Tag:--.--.---`) with exact `large` flags and `underline_divider` bars; two consecutive snapshots reflected real-time quick-key blink state transitions (`1`/`0` -> blank).
+    - `scanner_b.display_lines`: omitted (`status_line: "DISABLED"`).
+  - Live `/` & `/static/app.js`: returned `cache-control: no-cache` with `lcdScreenA` and `renderLcdMirror` present.
+  - Process & logs: PID `146859` running at `5.2%` CPU, `0.1%` MEM (`7.3M`), zero `WARN`/`ERROR`/`ALSA`/`JACK` messages for PID `146859`.
+- **Gotchas / Warnings for Next Model:**
+  - None.
+- **Next Tasks / Unfinished Work:** None.
