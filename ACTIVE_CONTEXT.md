@@ -430,3 +430,18 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - None.
 - **Next Tasks / Unfinished Work:** None.
+
+### 2026-11-21 14:18 | Claude / Antigravity (Windows Dev Workstation & VM 123 Deploy)
+- **Phase:** UI Polish — Zero-Emoji Matte-Graphite RF Console Aesthetic
+- **Work Performed:**
+  - Removed all emojis across [`static/index.html`](static/index.html), [`static/app.js`](static/app.js), and [`static/style.css`](static/style.css), replacing them with crisp inline SVG icons and CSS LED status dots (`rec-badge::before`, `engine-status::before`).
+  - Redesigned [`static/style.css`](static/style.css) into a tighter matte-graphite instrumentation aesthetic (`#090b10` / `#10141d` / `#04070c` recessed LCD bezel, sharper `8px`/`6px`/`4px` corners, tabular numerals, segmented VU track ticks, responsive `@media (max-width: 960px)` layout) while preserving all element IDs, handlers, and the live LCD mirror.
+  - Updated header/button/badge copy and status classes in [`static/app.js`](static/app.js) (`REC DISABLED`/`REC ACTIVE`/`REC STANDBY`, `engine-status`, `REC`, `Scanning...`/`Scan Serial Ports`).
+- **Intentional Behaviour Deviations from Python:** Pure visual/copy refinement in Rust dashboard static assets; backend behavior and API contracts untouched.
+- **Live Capture Impact:** Brief service restart on VM 123 during release rebuild/deploy.
+- **Verification Performed:**
+  - Static check: zero characters with `ord >= 0x2600` across `static/index.html`, `static/app.js`, and `static/style.css`.
+  - Windows gate: `cargo fmt --all -- --check` clean, `cargo clippy --workspace --all-targets -- -D warnings` (0 warnings), `cargo test --workspace --no-fail-fast` (46 passed, 0 failed).
+- **Gotchas / Warnings for Next Model:**
+  - `sc-server` embeds `static/` at compile time in `--release`, so VM 123 requires `cargo build --release --bin scanner-controller` after `git pull`.
+- **Next Tasks / Unfinished Work:** Deploy and verify live on VM 123.

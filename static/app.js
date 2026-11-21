@@ -228,7 +228,7 @@ function toggleConnectionModeUI(suffix) {
 function refreshComPorts() {
   loadAvailableComPorts(() => {
     alert(`Refreshed available COM ports!\nFound ${availableComPorts.length} port(s):\n` +
-          availableComPorts.map(p => `• ${p.device} (${p.description})`).join('\n'));
+          availableComPorts.map(p => `- ${p.device} (${p.description})`).join('\n'));
   });
 }
 
@@ -335,15 +335,15 @@ function renderUI(state) {
   if (globalRecBadge) {
     if (!recordingEnabled) {
       globalRecBadge.className = "rec-badge rec-off";
-      globalRecBadge.innerText = "● REC DISABLED";
+      globalRecBadge.innerText = "REC DISABLED";
       document.title = "Uniden Scanner Mutual Exclusion Controller";
     } else if (recA || recB) {
       globalRecBadge.className = "rec-badge rec-active";
-      globalRecBadge.innerText = "🔴 REC ACTIVE";
-      document.title = "🔴 [REC] Uniden Scanner Mutual Exclusion Controller";
+      globalRecBadge.innerText = "REC ACTIVE";
+      document.title = "[REC] Uniden Scanner Mutual Exclusion Controller";
     } else {
       globalRecBadge.className = "rec-badge rec-on";
-      globalRecBadge.innerText = "● REC STANDBY";
+      globalRecBadge.innerText = "REC STANDBY";
       document.title = "Uniden Scanner Mutual Exclusion Controller";
     }
   }
@@ -352,14 +352,14 @@ function renderUI(state) {
   const engineStatusEl = document.getElementById("engineModeStatus");
   if (engineStatusEl) {
     if (enabledA && enabledB) {
-      engineStatusEl.style.color = "var(--emerald-recv)";
-      engineStatusEl.innerText = "● Mutual Exclusion Active (Dual-Radio Mode)";
+      engineStatusEl.className = "engine-status active";
+      engineStatusEl.innerText = "Dual-Radio Active";
     } else if (enabledA || enabledB) {
-      engineStatusEl.style.color = "var(--text-muted)";
-      engineStatusEl.innerText = "○ Single-Radio Mode — Mutual Exclusion Standby";
+      engineStatusEl.className = "engine-status standby";
+      engineStatusEl.innerText = "Single-Radio — Exclusion Standby";
     } else {
-      engineStatusEl.style.color = "var(--text-dim)";
-      engineStatusEl.innerText = "○ All Scanners Disabled";
+      engineStatusEl.className = "engine-status off";
+      engineStatusEl.innerText = "All Scanners Disabled";
     }
   }
 
@@ -613,7 +613,7 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
       recBadge.innerText = "REC OFF";
     } else if (data.receiving && !data.avoided) {
       recBadge.className = "rec-badge rec-active";
-      recBadge.innerText = "🔴 REC";
+      recBadge.innerText = "REC";
     } else {
       recBadge.className = "rec-badge rec-on";
       recBadge.innerText = "REC ON";
@@ -736,7 +736,7 @@ function closeAutoDetectModal() {
 function runAutoDetect() {
   const body = document.getElementById("autoDetectTableBody");
   const btn = document.getElementById("btnRunAutoDetect");
-  if (btn) btn.innerText = "⏳ Probing Ports...";
+  if (btn) btn.innerText = "Scanning...";
 
   if (body) {
     body.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 20px;">Probing COM ports at standard baud rates... Please wait.</td></tr>`;
@@ -745,13 +745,13 @@ function runAutoDetect() {
   fetch('/api/ports/detect')
     .then(res => res.json())
     .then(data => {
-      if (btn) btn.innerText = "🔄 Run Serial Auto-Detect";
+      if (btn) btn.innerText = "Scan Serial Ports";
       if (data.status === "success") {
         renderAutoDetectGrid(data.ports);
       }
     })
     .catch(err => {
-      if (btn) btn.innerText = "🔄 Run Serial Auto-Detect";
+      if (btn) btn.innerText = "Scan Serial Ports";
       if (body) body.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--rose-danger); padding: 20px;">Failed to detect ports: ${err}</td></tr>`;
     });
 }

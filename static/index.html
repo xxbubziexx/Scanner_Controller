@@ -11,18 +11,26 @@
   <!-- Navbar Header -->
   <header>
     <div class="logo-area">
-      <div class="logo-icon">U</div>
+      <div class="logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/>
+          <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/>
+          <circle cx="12" cy="12" r="2"/>
+          <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/>
+          <path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+        </svg>
+      </div>
       <div class="logo-text">
         <h1>Uniden Dynamic Scanner Sync</h1>
-        <p>Mutual Exclusion Controller • ProScan Auto-Detect &amp; Recording Engine</p>
+        <p>Mutual Exclusion Controller &middot; Auto-Detect &amp; Recording Engine</p>
       </div>
     </div>
 
     <div class="header-controls">
-      <span class="rec-badge rec-on" id="globalRecBadge" title="Background Call Recording Status">● REC STANDBY</span>
+      <span class="rec-badge rec-on" id="globalRecBadge" title="Background Call Recording Status">REC STANDBY</span>
 
       <div class="sync-toggle-box">
-        <span style="font-size: 13px; font-weight: 600;">🔴 Record Calls</span>
+        <span style="font-size: 12.5px; font-weight: 600;">Record Calls</span>
         <label class="toggle-switch">
           <input type="checkbox" id="masterRecordToggle" checked onchange="toggleMasterRecord(this.checked)">
           <span class="slider"></span>
@@ -30,14 +38,20 @@
       </div>
 
       <div class="sync-toggle-box">
-        <span style="font-size: 13px; font-weight: 600;">Mutual Exclusion Sync</span>
+        <span style="font-size: 12.5px; font-weight: 600;">Mutual Exclusion Sync</span>
         <label class="toggle-switch">
           <input type="checkbox" id="masterSyncToggle" checked onchange="toggleMasterSync(this.checked)">
           <span class="slider"></span>
         </label>
       </div>
-      <button class="btn btn-outline" onclick="openAutoDetectModal()">🔍 Auto-Detect Ports</button>
-      <button class="btn btn-outline" onclick="openSettingsModal()">⚙️ Settings</button>
+      <button class="btn btn-outline" onclick="openAutoDetectModal()">
+        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>Detect Ports</span>
+      </button>
+      <button class="btn btn-outline" onclick="openSettingsModal()">
+        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>
+        <span>Settings</span>
+      </button>
     </div>
   </header>
 
@@ -100,7 +114,7 @@
 
         <!-- Live Audio VU Meter (Scanner A) -->
         <div class="vu-meter-row">
-          <span class="vu-label">🎙️ AUDIO VU</span>
+          <span class="vu-label">AUDIO VU</span>
           <div class="vu-bar-track">
             <div class="vu-bar-fill" id="vuBarA"></div>
           </div>
@@ -108,7 +122,10 @@
         </div>
 
         <div class="scanner-actions">
-          <button id="skipBtnA" class="btn btn-danger" style="width: 100%;" onclick="sendSkip('scanner_a')">⏭️ SKIP / AVOID</button>
+          <button id="skipBtnA" class="btn btn-danger" style="width: 100%;" onclick="sendSkip('scanner_a')">
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg>
+            <span>SKIP / AVOID</span>
+          </button>
         </div>
       </div>
     </div>
@@ -170,7 +187,7 @@
 
         <!-- Live Audio VU Meter (Scanner B) -->
         <div class="vu-meter-row">
-          <span class="vu-label">🎙️ AUDIO VU</span>
+          <span class="vu-label">AUDIO VU</span>
           <div class="vu-bar-track">
             <div class="vu-bar-fill" id="vuBarB"></div>
           </div>
@@ -178,7 +195,10 @@
         </div>
 
         <div class="scanner-actions">
-          <button id="skipBtnB" class="btn btn-danger" style="width: 100%;" onclick="sendSkip('scanner_b')">⏭️ SKIP / LOCKOUT</button>
+          <button id="skipBtnB" class="btn btn-danger" style="width: 100%;" onclick="sendSkip('scanner_b')">
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg>
+            <span>SKIP / LOCKOUT</span>
+          </button>
         </div>
       </div>
     </div>
@@ -186,8 +206,11 @@
     <!-- Mutual Exclusion Configuration Hub -->
     <div class="panel full-width" id="exclusionEnginePanel">
       <div class="panel-header">
-        <h2>⚡ Mutual Exclusion Engine Controls</h2>
-        <span style="font-size: 13px; color: var(--emerald-recv); font-weight: 600;" id="engineModeStatus">● Engine Active (Hardware Serial Mode)</span>
+        <h2 class="panel-title">
+          <svg class="ui-icon panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>Mutual Exclusion Engine</span>
+        </h2>
+        <span class="engine-status active" id="engineModeStatus">Dual-Radio Active</span>
       </div>
 
       <div class="rule-grid">
@@ -237,9 +260,12 @@
     <!-- Live Audio Loopback Monitor Panel -->
     <div class="panel full-width">
       <div class="panel-header">
-        <h2>🔊 Live Audio Loopback Monitor</h2>
+        <h2 class="panel-title">
+          <svg class="ui-icon panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+          <span>Audio Loopback Monitor</span>
+        </h2>
         <div class="sync-toggle-box">
-          <span style="font-size: 13px; font-weight: 600;">Enable Speaker Loopback</span>
+          <span style="font-size: 12.5px; font-weight: 600;">Enable Speaker Loopback</span>
           <label class="toggle-switch">
             <input type="checkbox" id="loopbackEnabledToggle" checked onchange="updateLoopbackControls()">
             <span class="slider"></span>
@@ -251,7 +277,10 @@
         <div class="form-group">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <label for="loopbackOutputSelect">Output Speaker / Headphones</label>
-            <button type="button" onclick="loadAudioOutputDevices(true)" style="background: none; border: none; color: var(--cyan-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Speakers</button>
+            <button type="button" class="btn-inline-refresh" onclick="loadAudioOutputDevices(true)">
+              <svg class="ui-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+              <span>Refresh</span>
+            </button>
           </div>
           <select id="loopbackOutputSelect" class="form-select" onchange="updateLoopbackControls()">
             <option value="">Default System Output Speaker</option>
@@ -278,10 +307,13 @@
     <!-- Live Mutual Exclusion Event Feed -->
     <div class="panel full-width">
       <div class="panel-header">
-        <h2>📜 Real-Time Mutual Exclusion Activity Log</h2>
+        <h2 class="panel-title">
+          <svg class="ui-icon panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+          <span>Exclusion Activity Log</span>
+        </h2>
         <div style="display: flex; align-items: center; gap: 12px;">
-          <span style="font-size: 12px; color: var(--text-dim);" id="logCount">0 events recorded</span>
-          <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 12px;" onclick="clearLogView()">🧹 Clear View</button>
+          <span style="font-size: 12px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace;" id="logCount">0 events recorded</span>
+          <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 12px;" onclick="clearLogView()">Clear</button>
         </div>
       </div>
 
@@ -312,7 +344,7 @@
   <div class="modal-overlay" id="autoDetectModal">
     <div class="modal-card auto-detect-modal-card">
       <div class="modal-header">
-        <h2>🔍 ProScan Serial Port &amp; Scanner Auto-Detect</h2>
+        <h2>Serial Port &amp; LAN Discovery</h2>
         <button class="close-btn" onclick="closeAutoDetectModal()">&times;</button>
       </div>
 
@@ -321,8 +353,8 @@
       </p>
 
       <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-        <button class="btn btn-primary" id="btnRunAutoDetect" onclick="runAutoDetect()">🔄 Run Serial Auto-Detect</button>
-        <button class="btn btn-outline" onclick="runLANDiscovery()">🌐 Discover LAN UDP Scanners</button>
+        <button class="btn btn-primary" id="btnRunAutoDetect" onclick="runAutoDetect()">Scan Serial Ports</button>
+        <button class="btn btn-outline" onclick="runLANDiscovery()">Discover LAN (UDP)</button>
       </div>
 
       <div style="overflow-x: auto; max-height: 350px; overflow-y: auto;">
@@ -338,7 +370,7 @@
           </thead>
           <tbody id="autoDetectTableBody">
             <tr>
-              <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 20px;">Click "Run Serial Auto-Detect" to scan connected hardware ports.</td>
+              <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 20px;">Click "Scan Serial Ports" to probe connected hardware ports.</td>
             </tr>
           </tbody>
         </table>
@@ -354,7 +386,7 @@
   <div class="modal-overlay" id="settingsModal">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>⚙️ Configuration &amp; Recording Settings</h2>
+        <h2>Configuration &amp; Recording</h2>
         <button class="close-btn" onclick="closeSettingsModal()">&times;</button>
       </div>
 
@@ -370,7 +402,7 @@
             <span class="tab-pill" id="tabPillB">ON</span>
           </button>
           <button type="button" class="settings-tab-btn" data-tab="recording" onclick="switchSettingsTab('recording')">
-            <span>📁 Recording &amp; Output</span>
+            <span>Recording &amp; Output</span>
           </button>
         </div>
 
@@ -399,7 +431,10 @@
               <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <label id="lbl_port_a">Available COM Port</label>
-                  <button type="button" onclick="refreshComPorts()" style="background: none; border: none; color: var(--cyan-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Ports</button>
+                  <button type="button" class="btn-inline-refresh" onclick="refreshComPorts()">
+                    <svg class="ui-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                    <span>Refresh</span>
+                  </button>
                 </div>
                 <select id="cfg_port_a" class="form-select"></select>
                 <input type="text" id="cfg_custom_port_a" class="form-input" style="display: none; margin-top: 6px;" placeholder="e.g. 192.168.1.50 or COM5">
@@ -418,7 +453,10 @@
               <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <label>Audio Input Device</label>
-                  <button type="button" onclick="loadAudioDevices(true)" style="background: none; border: none; color: var(--cyan-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Audio</button>
+                  <button type="button" class="btn-inline-refresh" onclick="loadAudioDevices(true)">
+                    <svg class="ui-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                    <span>Refresh</span>
+                  </button>
                 </div>
                 <select id="cfg_audio_dev_a" class="form-select"></select>
               </div>
@@ -473,7 +511,10 @@
               <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <label id="lbl_port_b">Available COM Port</label>
-                  <button type="button" onclick="refreshComPorts()" style="background: none; border: none; color: var(--violet-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Ports</button>
+                  <button type="button" class="btn-inline-refresh b-accent" onclick="refreshComPorts()">
+                    <svg class="ui-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                    <span>Refresh</span>
+                  </button>
                 </div>
                 <select id="cfg_port_b" class="form-select"></select>
                 <input type="text" id="cfg_custom_port_b" class="form-input" style="display: none; margin-top: 6px;" placeholder="e.g. 192.168.1.50 or COM5">
@@ -492,7 +533,10 @@
               <div class="form-group">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                   <label>Audio Input Device</label>
-                  <button type="button" onclick="loadAudioDevices(true)" style="background: none; border: none; color: var(--violet-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Audio</button>
+                  <button type="button" class="btn-inline-refresh b-accent" onclick="loadAudioDevices(true)">
+                    <svg class="ui-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                    <span>Refresh</span>
+                  </button>
                 </div>
                 <select id="cfg_audio_dev_b" class="form-select"></select>
               </div>
@@ -525,7 +569,7 @@
 
           <!-- Tab 3: Recording & Output -->
           <div class="settings-tab-pane" id="tabPane_recording">
-            <h3 style="font-size: 14px; margin-bottom: 12px; color: var(--emerald-recv);">📁 Audio Output &amp; Format Settings</h3>
+            <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; color: var(--emerald-recv);">Audio Output &amp; Format</h3>
             <div class="rule-grid">
               <div class="form-group full-width">
                 <label for="cfg_output_dir">Audio Output Directory</label>
@@ -562,7 +606,7 @@
 
             <!-- ProScan 37 % Format Specifiers Reference Drawer -->
             <details class="specifiers-drawer">
-              <summary>📖 ProScan % Format Specifiers Reference (37 Supported Tokens)</summary>
+              <summary>ProScan % Format Specifiers Reference (37 Tokens)</summary>
               <div class="specifiers-grid" id="specifiersGrid"></div>
             </details>
           </div>
