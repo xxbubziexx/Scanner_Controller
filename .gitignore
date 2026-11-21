@@ -1,3 +1,7 @@
+# Local runtime configuration & backups (untracked; see config.example.json)
+config.json
+config.json.bak
+
 # Rust build artifacts
 target/
 

@@ -1,11 +1,12 @@
 let socket = null;
 let currentAppState = null;
 let pollingInterval = null;
-let modelsCatalog = [];
 let availableComPorts = [];
 let availableAudioDevices = [];
 let availableOutputDevices = [];
 let clearedEventTimestamp = 0;
+
+const STANDARD_BAUDS = [115200, 57600, 38400, 19200, 9600, 4800, 2400];
 
 const PROSCAN_SPECIFIERS = [
   { code: "%DT", desc: "Date & Time (YYYY-MM-DD HH-MM-SS)" },
@@ -56,6 +57,24 @@ function renderSpecifiersReference() {
       <span class="spec-desc">${s.desc}</span>
     </div>
   `).join("");
+}
+
+function switchSettingsTab(tabKey) {
+  document.querySelectorAll(".settings-tab-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tabKey);
+  });
+  document.querySelectorAll(".settings-tab-pane").forEach(pane => {
+    pane.classList.toggle("active", pane.id === `tabPane_${tabKey}`);
+  });
+}
+
+function syncSettingsEnablePill(suffix) {
+  const chk = document.getElementById(`cfg_enabled_${suffix}`);
+  const pill = document.getElementById(`tabPill${suffix.toUpperCase()}`);
+  if (!chk || !pill) return;
+  const enabled = chk.checked;
+  pill.innerText = enabled ? "ON" : "OFF";
+  pill.classList.toggle("off", !enabled);
 }
 
 function formatPreviewTemplate(tpl, scannerLabel) {
@@ -134,7 +153,7 @@ function loadAvailableComPorts(callback) {
     .then(res => res.json())
     .then(data => {
       if (data.status === "success") {
-        availableComPorts = data.ports;
+        availableComPorts = data.ports || [];
         populateComPortDropdowns();
         if (callback) callback();
       }
@@ -148,7 +167,7 @@ function populateComPortDropdowns() {
   if (!selA || !selB) return;
 
   function buildOptions(currentVal) {
-    let html = `<option value="NONE" ${currentVal === "NONE" ? "selected" : ""}>NONE (Disabled)</option>`;
+    let html = `<option value="NONE" ${currentVal === "NONE" ? "selected" : ""}>NONE (Unassigned)</option>`;
     if (availableComPorts.length > 0) {
       availableComPorts.forEach(p => {
         const selected = (p.device === currentVal) ? "selected" : "";
@@ -162,7 +181,7 @@ function populateComPortDropdowns() {
     return html;
   }
 
-  const curA = currentAppState && currentAppState.config ? currentAppState.config.scanner_a.port : "COM5";
+  const curA = currentAppState && currentAppState.config ? currentAppState.config.scanner_a.port : "NONE";
   const curB = currentAppState && currentAppState.config ? currentAppState.config.scanner_b.port : "NONE";
 
   selA.innerHTML = buildOptions(curA);
@@ -211,6 +230,18 @@ function refreshComPorts() {
     alert(`Refreshed available COM ports!\nFound ${availableComPorts.length} port(s):\n` +
           availableComPorts.map(p => `• ${p.device} (${p.description})`).join('\n'));
   });
+}
+
+function populateBaudDropdown(suffix, selectedBaud) {
+  const baudSel = document.getElementById(`cfg_baud_${suffix}`);
+  if (!baudSel) return;
+  let baudHtml = "";
+  STANDARD_BAUDS.forEach(b => {
+    baudHtml += `<option value="${b}">${b}</option>`;
+  });
+  baudSel.innerHTML = baudHtml;
+  const val = Number(selectedBaud) || 115200;
+  baudSel.value = STANDARD_BAUDS.includes(val) ? String(val) : "115200";
 }
 
 function connectWebSocket() {
@@ -272,85 +303,6 @@ function fetchStateViaHTTP() {
     });
 }
 
-function loadModelsCatalog() {
-  fetch('/api/models/catalog')
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === "success") {
-        modelsCatalog = data.models;
-        populateModelDropdowns();
-      }
-    });
-}
-
-function populateModelDropdowns() {
-  const selA = document.getElementById("cfg_model_a");
-  const selB = document.getElementById("cfg_model_b");
-  const cardSelA = document.getElementById("cardModelSelectA");
-  const cardSelB = document.getElementById("cardModelSelectB");
-
-  if (modelsCatalog.length === 0) return;
-
-  let optsHtml = "";
-  modelsCatalog.forEach(m => {
-    optsHtml += `<option value="${m.model}">${m.model}</option>`;
-  });
-
-  if (selA) selA.innerHTML = optsHtml;
-  if (selB) selB.innerHTML = optsHtml;
-  if (cardSelA) cardSelA.innerHTML = optsHtml;
-  if (cardSelB) cardSelB.innerHTML = optsHtml;
-
-  if (currentAppState && currentAppState.config) {
-    if (selA) selA.value = currentAppState.config.scanner_a.model;
-    if (selB) selB.value = currentAppState.config.scanner_b.model;
-    if (cardSelA) cardSelA.value = currentAppState.config.scanner_a.model;
-    if (cardSelB) cardSelB.value = currentAppState.config.scanner_b.model;
-  }
-
-  updateBaudOptions('a');
-  updateBaudOptions('b');
-}
-
-function changeModelFromCard(scannerId, newModel) {
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({
-      type: "CHANGE_MODEL",
-      scanner_id: scannerId,
-      model: newModel
-    }));
-  } else {
-    fetch(`/api/scanner/${scannerId}/model`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: newModel })
-    }).catch(err => console.error("Error switching model:", err));
-  }
-}
-
-function updateBaudOptions(suffix) {
-  const modelSel = document.getElementById(`cfg_model_${suffix}`);
-  const baudSel = document.getElementById(`cfg_baud_${suffix}`);
-  if (!modelSel || !baudSel) return;
-
-  const selectedModel = modelSel.value;
-  const match = modelsCatalog.find(m => m.model === selectedModel);
-  const allowed = match ? match.allowed_baud_rates : [115200, 57600, 38400, 19200, 9600, 4800];
-
-  let baudHtml = "";
-  allowed.forEach(b => {
-    baudHtml += `<option value="${b}">${b}</option>`;
-  });
-  baudSel.innerHTML = baudHtml;
-
-  if (currentAppState && currentAppState.config) {
-    const currentBaud = suffix === 'a' ? currentAppState.config.scanner_a.baud_rate : currentAppState.config.scanner_b.baud_rate;
-    if (allowed.includes(currentBaud)) {
-      baudSel.value = currentBaud;
-    }
-  }
-}
-
 function renderUI(state) {
   if (!state) return;
 
@@ -361,15 +313,8 @@ function renderUI(state) {
   const levels = state.audio_levels || { scanner_a: 0, scanner_b: 0 };
   const activeExclusions = state.active_exclusions || {};
 
-  // Update Model Selects / Badges
-  const cardSelA = document.getElementById("cardModelSelectA");
-  const cardSelB = document.getElementById("cardModelSelectB");
-  if (cardSelA && scA.model && document.activeElement !== cardSelA) {
-    cardSelA.value = scA.model;
-  }
-  if (cardSelB && scB.model && document.activeElement !== cardSelB) {
-    cardSelB.value = scB.model;
-  }
+  const enabledA = !(cfg.scanner_a && cfg.scanner_a.enabled === false);
+  const enabledB = !(cfg.scanner_b && cfg.scanner_b.enabled === false);
 
   // 1. Master Sync & Record Toggles
   const syncToggle = document.getElementById("masterSyncToggle");
@@ -384,8 +329,8 @@ function renderUI(state) {
   }
 
   // Global Recording Status Badge + Document Title Indicator
-  const recA = recordingEnabled && cfg.scanner_a && cfg.scanner_a.enabled && cfg.scanner_a.audio_enabled && scA.receiving && !scA.avoided;
-  const recB = recordingEnabled && cfg.scanner_b && cfg.scanner_b.enabled && cfg.scanner_b.audio_enabled && scB.receiving && !scB.avoided;
+  const recA = recordingEnabled && enabledA && cfg.scanner_a && cfg.scanner_a.audio_enabled && scA.receiving && !scA.avoided;
+  const recB = recordingEnabled && enabledB && cfg.scanner_b && cfg.scanner_b.audio_enabled && scB.receiving && !scB.avoided;
   const globalRecBadge = document.getElementById("globalRecBadge");
   if (globalRecBadge) {
     if (!recordingEnabled) {
@@ -403,7 +348,21 @@ function renderUI(state) {
     }
   }
 
-  // 2. Rules Controls
+  // 2. Mutual Exclusion Panel State
+  const engineStatusEl = document.getElementById("engineModeStatus");
+  if (engineStatusEl) {
+    if (enabledA && enabledB) {
+      engineStatusEl.style.color = "var(--emerald-recv)";
+      engineStatusEl.innerText = "● Mutual Exclusion Active (Dual-Radio Mode)";
+    } else if (enabledA || enabledB) {
+      engineStatusEl.style.color = "var(--text-muted)";
+      engineStatusEl.innerText = "○ Single-Radio Mode — Mutual Exclusion Standby";
+    } else {
+      engineStatusEl.style.color = "var(--text-dim)";
+      engineStatusEl.innerText = "○ All Scanners Disabled";
+    }
+  }
+
   if (cfg.sync) {
     const exclEl = document.getElementById("exclusionModeSelect");
     const prioEl = document.getElementById("priorityModeSelect");
@@ -441,16 +400,16 @@ function renderUI(state) {
       if (lbVolLbl) lbVolLbl.innerText = `${pct}%`;
     }
     if (lbOut && document.activeElement !== lbOut) {
-      const targetVal = (cfg.audio_loopback.output_device_index === null || cfg.audio_loopback.output_device_index === undefined)
-        ? ""
-        : String(cfg.audio_loopback.output_device_index);
-      if ([...lbOut.options].some(o => o.value === targetVal)) {
-        lbOut.value = targetVal;
-      }
+      selectDeviceOptionByNameOrIndex(
+        lbOut,
+        cfg.audio_loopback.output_device_name,
+        cfg.audio_loopback.output_device_index,
+        ""
+      );
     }
   }
 
-  // 5. Render Scanner A & B Cards (with VU meters and REC badges)
+  // 5. Render Scanner A & B Cards
   renderScannerCard("A", scA, cfg.scanner_a || {}, recordingEnabled, levels.scanner_a || 0);
   renderScannerCard("B", scB, cfg.scanner_b || {}, recordingEnabled, levels.scanner_b || 0);
 
@@ -484,6 +443,7 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
   const badge = document.getElementById(`badge${suffix}`);
   const statusText = document.getElementById(`statusText${suffix}`);
   const recBadge = document.getElementById(`recBadge${suffix}`);
+  const modelBadge = document.getElementById(`cardModelBadge${suffix}`);
 
   const sysEl = document.getElementById(`sys${suffix}`);
   const deptEl = document.getElementById(`dept${suffix}`);
@@ -498,11 +458,34 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
   const vuPct = document.getElementById(`vuPct${suffix}`);
   const cardEnable = document.getElementById(`cardEnable${suffix}`);
   const cardAudioEnable = document.getElementById(`cardAudioEnable${suffix}`);
+  const cardAudioWrap = document.getElementById(`cardAudioWrap${suffix}`);
+  const activeBody = document.getElementById(`cardActiveBody${suffix}`);
+  const disabledNotice = document.getElementById(`cardDisabledNotice${suffix}`);
 
   if (!card) return;
 
   const isDisabled = data.status_line === "DISABLED" || scannerCfg.enabled === false;
   const idleText = isDisabled ? "DISABLED" : (data.connected ? "Scanning..." : "DISCONNECTED");
+
+  if (modelBadge) {
+    modelBadge.innerText = isDisabled
+      ? "DISABLED"
+      : (data.model || (data.connected ? "SCANNER" : "AUTO-DETECT"));
+  }
+
+  if (cardEnable && document.activeElement !== cardEnable) {
+    cardEnable.checked = scannerCfg.enabled !== false;
+  }
+  if (cardAudioEnable && document.activeElement !== cardAudioEnable) {
+    cardAudioEnable.checked = scannerCfg.audio_enabled !== false;
+  }
+  if (cardAudioWrap) {
+    cardAudioWrap.style.display = isDisabled ? "none" : "";
+  }
+
+  if (activeBody) activeBody.style.display = isDisabled ? "none" : "";
+  if (disabledNotice) disabledNotice.style.display = isDisabled ? "block" : "none";
+  card.style.opacity = isDisabled ? "0.6" : "1";
 
   sysEl.innerText = data.system_name || idleText;
   deptEl.innerText = data.dept_name || "";
@@ -512,22 +495,9 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
   modEl.innerText = data.modulation || "NFM";
   if (uidEl) uidEl.innerText = data.unit_id || "--";
 
-  card.style.opacity = isDisabled ? "0.6" : "1";
-  const skipBtn = document.getElementById(`skipBtn${suffix}`);
-  if (skipBtn) {
-    skipBtn.style.display = isDisabled ? "none" : "";
-  }
-
-  if (cardEnable && document.activeElement !== cardEnable) {
-    cardEnable.checked = scannerCfg.enabled !== false;
-  }
-  if (cardAudioEnable && document.activeElement !== cardAudioEnable) {
-    cardAudioEnable.checked = scannerCfg.audio_enabled !== false;
-  }
-
-  // Per-card REC Badge (gui.py parity: REC OFF / REC ON / 🔴 REC)
+  // Per-card REC Badge
   if (recBadge) {
-    const canRecord = masterRecordEnabled && scannerCfg.enabled !== false && scannerCfg.audio_enabled !== false;
+    const canRecord = masterRecordEnabled && !isDisabled && scannerCfg.audio_enabled !== false;
     if (!canRecord) {
       recBadge.className = "rec-badge rec-off";
       recBadge.innerText = "REC OFF";
@@ -540,8 +510,8 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
     }
   }
 
-  // Live Audio VU Meter (gui.py:924-953 color thresholds: <60% green, 60-84% amber, >=85% red)
-  const clampedLevel = Math.max(0, Math.min(100, Number(audioLevelPct) || 0));
+  // Live Audio VU Meter
+  const clampedLevel = isDisabled ? 0 : Math.max(0, Math.min(100, Number(audioLevelPct) || 0));
   if (vuBar) {
     vuBar.style.width = `${clampedLevel}%`;
     if (clampedLevel >= 85) {
@@ -590,7 +560,7 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
   // RSSI Bars
   if (rssiContainer) {
     const bars = rssiContainer.querySelectorAll(".rssi-bar");
-    const level = data.rssi || (data.receiving ? 4 : 0);
+    const level = isDisabled ? 0 : (data.rssi || (data.receiving ? 4 : 0));
     bars.forEach((bar, idx) => {
       if (idx < level) {
         bar.classList.add("active");
@@ -698,7 +668,7 @@ function renderAutoDetectGrid(ports) {
         <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11px;" onclick="applyAutoDetectedPort('${p.port}', ${p.baud_rate}, '${p.model}', 'scanner_b')">Use Scanner B</button>
       `;
     } else {
-      btnHtml = `<span style="font-size: 11px; color: var(--text-dim);">Disabled</span>`;
+      btnHtml = `<span style="font-size: 11px; color: var(--text-dim);">Active / Busy</span>`;
     }
 
     html += `
@@ -724,9 +694,7 @@ function applyAutoDetectedPort(port, baudRate, detectedModel, targetScannerId) {
   target.port = port;
   target.enabled = true;
   if (baudRate > 0) target.baud_rate = baudRate;
-  if (detectedModel && modelsCatalog.some(m => m.model === detectedModel)) {
-    target.model = detectedModel;
-  }
+  if (detectedModel) target.model = detectedModel;
   target.connection_mode = "SERIAL";
 
   fetch('/api/config', {
@@ -787,9 +755,7 @@ function applyLANScanner(ipHost, detectedModel, targetScannerId) {
   target.ip_host = ipHost;
   target.enabled = true;
   target.connection_mode = "IP";
-  if (detectedModel && modelsCatalog.some(m => m.model === detectedModel)) {
-    target.model = detectedModel;
-  }
+  if (detectedModel) target.model = detectedModel;
 
   fetch('/api/config', {
     method: 'POST',
@@ -872,7 +838,7 @@ function updateLoopbackControls() {
   if (!currentAppState || !currentAppState.config) return;
   const updated = JSON.parse(JSON.stringify(currentAppState.config));
   if (!updated.audio_loopback) {
-    updated.audio_loopback = { enabled: true, output_device_index: null, volume: 0.8, pan_mode: "STEREO_SPLIT" };
+    updated.audio_loopback = { enabled: true, output_device_index: null, output_device_name: null, volume: 0.8, pan_mode: "STEREO_SPLIT" };
   }
 
   const lbToggle = document.getElementById("loopbackEnabledToggle");
@@ -882,7 +848,16 @@ function updateLoopbackControls() {
 
   if (lbToggle) updated.audio_loopback.enabled = lbToggle.checked;
   if (lbOut) {
-    updated.audio_loopback.output_device_index = (lbOut.value === "") ? null : parseInt(lbOut.value, 10);
+    const selOpt = lbOut.options[lbOut.selectedIndex];
+    if (lbOut.value === "") {
+      updated.audio_loopback.output_device_index = null;
+      updated.audio_loopback.output_device_name = null;
+    } else if (selOpt && selOpt.dataset.name) {
+      updated.audio_loopback.output_device_name = selOpt.dataset.name;
+      updated.audio_loopback.output_device_index = lbOut.value.startsWith("NAME:")
+        ? null
+        : parseInt(lbOut.value, 10);
+    }
   }
   if (lbPan) updated.audio_loopback.pan_mode = lbPan.value;
   if (lbVol) updated.audio_loopback.volume = Math.round(parseFloat(lbVol.value)) / 100.0;
@@ -925,93 +900,104 @@ function updateEngineRules() {
 
 function openSettingsModal() {
   const modal = document.getElementById("settingsModal");
-  if (modal) {
-    modal.classList.add("active");
-    loadAvailableComPorts(() => {
-      if (currentAppState && currentAppState.config) {
-        const cfg = currentAppState.config;
-        document.getElementById("cfg_model_a").value = cfg.scanner_a.model;
-        document.getElementById("cfg_mode_a").value = cfg.scanner_a.connection_mode;
-        if (document.getElementById("cfg_lockout_a")) {
-          document.getElementById("cfg_lockout_a").value = cfg.scanner_a.lockout_method || "KEYPRESS";
-        }
+  if (!modal) return;
+  modal.classList.add("active");
+  switchSettingsTab("scannerA");
 
-        document.getElementById("cfg_model_b").value = cfg.scanner_b.model;
-        document.getElementById("cfg_mode_b").value = cfg.scanner_b.connection_mode;
-        if (document.getElementById("cfg_lockout_b")) {
-          document.getElementById("cfg_lockout_b").value = cfg.scanner_b.lockout_method || "KEYPRESS";
-        }
+  loadAvailableComPorts(() => {
+    if (currentAppState && currentAppState.config) {
+      const cfg = currentAppState.config;
+      const scA = currentAppState.scanner_a || {};
+      const scB = currentAppState.scanner_b || {};
 
-        populateComPortDropdowns();
+      const chkA = document.getElementById("cfg_enabled_a");
+      const chkB = document.getElementById("cfg_enabled_b");
+      if (chkA) chkA.checked = cfg.scanner_a.enabled !== false;
+      if (chkB) chkB.checked = cfg.scanner_b.enabled !== false;
+      syncSettingsEnablePill('a');
+      syncSettingsEnablePill('b');
 
-        const portA = cfg.scanner_a.port;
-        const portB = cfg.scanner_b.port;
-
-        const selA = document.getElementById("cfg_port_a");
-        const customA = document.getElementById("cfg_custom_port_a");
-        if ([...selA.options].some(o => o.value === portA)) {
-          selA.value = portA;
-          customA.style.display = "none";
-        } else {
-          selA.value = "CUSTOM";
-          customA.value = portA;
-          customA.style.display = "block";
-        }
-
-        const selB = document.getElementById("cfg_port_b");
-        const customB = document.getElementById("cfg_custom_port_b");
-        if ([...selB.options].some(o => o.value === portB)) {
-          selB.value = portB;
-          customB.style.display = "none";
-        } else {
-          selB.value = "CUSTOM";
-          customB.value = portB;
-          customB.style.display = "block";
-        }
-
-        toggleConnectionModeUI('a');
-        toggleConnectionModeUI('b');
-
-        updateBaudOptions('a');
-        updateBaudOptions('b');
-
-        if (document.getElementById("cfg_filename_template_a")) {
-          document.getElementById("cfg_filename_template_a").value = cfg.scanner_a.filename_template || "%DT - %S - %C (%TG)";
-        }
-        if (document.getElementById("cfg_tit2_template_a")) {
-          document.getElementById("cfg_tit2_template_a").value = cfg.scanner_a.tit2_template || "%C (%TG)";
-        }
-
-        if (document.getElementById("cfg_filename_template_b")) {
-          document.getElementById("cfg_filename_template_b").value = cfg.scanner_b.filename_template || "%DT - %S - %C (%TG)";
-        }
-        if (document.getElementById("cfg_tit2_template_b")) {
-          document.getElementById("cfg_tit2_template_b").value = cfg.scanner_b.tit2_template || "%C (%TG)";
-        }
-
-        if (cfg.feeder) {
-          document.getElementById("cfg_feeder_mode").value = cfg.feeder.feeder_mode;
-          document.getElementById("cfg_feeder_format").value = cfg.feeder.audio_format;
-          if (document.getElementById("cfg_feeder_sample_rate")) {
-            document.getElementById("cfg_feeder_sample_rate").value = String(cfg.feeder.sample_rate || 16000);
-          }
-          document.getElementById("cfg_feeder_inbox").value = cfg.feeder.inbox_directory;
-          if (document.getElementById("cfg_feeder_webhook")) {
-            document.getElementById("cfg_feeder_webhook").value = cfg.feeder.webhook_url || "http://127.0.0.1:5000/api/ingest";
-          }
-          if (document.getElementById("cfg_feeder_proscan_tags")) {
-            document.getElementById("cfg_feeder_proscan_tags").checked = cfg.feeder.enable_proscan_tags !== false;
-          }
-          if (document.getElementById("cfg_feeder_sidecar_json")) {
-            document.getElementById("cfg_feeder_sidecar_json").checked = cfg.feeder.enable_sidecar_json !== false;
-          }
-        }
-
-        updateTemplatePreviews();
-        loadAudioDevices();
+      const dmA = document.getElementById("cfg_detected_model_a");
+      const dmB = document.getElementById("cfg_detected_model_b");
+      if (dmA) {
+        dmA.innerText = scA.connected && scA.model
+          ? `${scA.model} (Auto-detected)`
+          : `${cfg.scanner_a.model || 'Auto-detected on connect'}`;
       }
-    });
-  }
+      if (dmB) {
+        dmB.innerText = scB.connected && scB.model
+          ? `${scB.model} (Auto-detected)`
+          : `${cfg.scanner_b.model || 'Auto-detected on connect'}`;
+      }
+
+      document.getElementById("cfg_mode_a").value = cfg.scanner_a.connection_mode;
+      if (document.getElementById("cfg_lockout_a")) {
+        document.getElementById("cfg_lockout_a").value = cfg.scanner_a.lockout_method || "KEYPRESS";
+      }
+
+      document.getElementById("cfg_mode_b").value = cfg.scanner_b.connection_mode;
+      if (document.getElementById("cfg_lockout_b")) {
+        document.getElementById("cfg_lockout_b").value = cfg.scanner_b.lockout_method || "KEYPRESS";
+      }
+
+      populateComPortDropdowns();
+      populateBaudDropdown('a', cfg.scanner_a.baud_rate);
+      populateBaudDropdown('b', cfg.scanner_b.baud_rate);
+
+      const portA = cfg.scanner_a.connection_mode === "IP"
+        ? (cfg.scanner_a.ip_host || "127.0.0.1")
+        : cfg.scanner_a.port;
+      const portB = cfg.scanner_b.connection_mode === "IP"
+        ? (cfg.scanner_b.ip_host || "127.0.0.1")
+        : cfg.scanner_b.port;
+
+      const selA = document.getElementById("cfg_port_a");
+      const customA = document.getElementById("cfg_custom_port_a");
+      if (cfg.scanner_a.connection_mode === "IP") {
+        customA.value = portA;
+      } else if ([...selA.options].some(o => o.value === portA)) {
+        selA.value = portA;
+        customA.style.display = "none";
+      } else {
+        selA.value = "CUSTOM";
+        customA.value = portA;
+        customA.style.display = "block";
+      }
+
+      const selB = document.getElementById("cfg_port_b");
+      const customB = document.getElementById("cfg_custom_port_b");
+      if (cfg.scanner_b.connection_mode === "IP") {
+        customB.value = portB;
+      } else if ([...selB.options].some(o => o.value === portB)) {
+        selB.value = portB;
+        customB.style.display = "none";
+      } else {
+        selB.value = "CUSTOM";
+        customB.value = portB;
+        customB.style.display = "block";
+      }
+
+      toggleConnectionModeUI('a');
+      toggleConnectionModeUI('b');
+
+      document.getElementById("cfg_filename_template_a").value = cfg.scanner_a.filename_template || "%DT - %S - %C (%TG)";
+      document.getElementById("cfg_tit2_template_a").value = cfg.scanner_a.tit2_template || "%C (%TG)";
+      document.getElementById("cfg_filename_template_b").value = cfg.scanner_b.filename_template || "%DT - %S - %C (%TG)";
+      document.getElementById("cfg_tit2_template_b").value = cfg.scanner_b.tit2_template || "%C (%TG)";
+
+      if (cfg.feeder) {
+        const outDirEl = document.getElementById("cfg_output_dir");
+        if (outDirEl) outDirEl.value = cfg.feeder.inbox_directory || "";
+        document.getElementById("cfg_feeder_format").value = cfg.feeder.audio_format || "MP3";
+        document.getElementById("cfg_feeder_sample_rate").value = String(cfg.feeder.sample_rate || 16000);
+        document.getElementById("cfg_feeder_proscan_tags").checked = cfg.feeder.enable_proscan_tags !== false;
+        document.getElementById("cfg_feeder_sidecar_json").checked = cfg.feeder.enable_sidecar_json !== false;
+      }
+
+      updateTemplatePreviews();
+      loadAudioDevices(false);
+    }
+  });
 }
 
 function closeSettingsModal() {
@@ -1019,20 +1005,37 @@ function closeSettingsModal() {
   if (modal) modal.classList.remove("active");
 }
 
-function getSelectedPort(suffix) {
+function getSelectedPortOrHost(suffix) {
   const mode = document.getElementById(`cfg_mode_${suffix}`).value;
   const sel = document.getElementById(`cfg_port_${suffix}`);
   const custom = document.getElementById(`cfg_custom_port_${suffix}`);
 
   if (mode === "IP") {
-    return custom.value.trim() || "127.0.0.1";
+    return { isIp: true, value: custom.value.trim() || "127.0.0.1" };
   }
-
   if (sel.value === "CUSTOM") {
-    return custom.value.trim() || "COM1";
+    return { isIp: false, value: custom.value.trim() || "NONE" };
   }
+  return { isIp: false, value: sel.value };
+}
 
-  return sel.value;
+function extractAudioSelection(selectEl) {
+  if (!selectEl) return { enabled: false, index: null, name: null };
+  const val = selectEl.value;
+  if (val === "DISABLED") {
+    return { enabled: false, index: null, name: null };
+  }
+  if (val === "") {
+    return { enabled: true, index: null, name: null };
+  }
+  const opt = selectEl.options[selectEl.selectedIndex];
+  const devName = opt && opt.dataset.name ? opt.dataset.name : null;
+  const idx = val.startsWith("NAME:") ? null : parseInt(val, 10);
+  return {
+    enabled: true,
+    index: isNaN(idx) ? null : idx,
+    name: devName
+  };
 }
 
 function saveConfiguration(event) {
@@ -1042,66 +1045,57 @@ function saveConfiguration(event) {
 
   const cfg = JSON.parse(JSON.stringify(currentAppState.config));
 
-  cfg.scanner_a.model = document.getElementById("cfg_model_a").value;
+  cfg.scanner_a.enabled = document.getElementById("cfg_enabled_a").checked;
   cfg.scanner_a.connection_mode = document.getElementById("cfg_mode_a").value;
-  cfg.scanner_a.port = getSelectedPort('a');
+  const epA = getSelectedPortOrHost('a');
+  if (epA.isIp) {
+    cfg.scanner_a.ip_host = epA.value;
+  } else {
+    cfg.scanner_a.port = epA.value;
+  }
   cfg.scanner_a.baud_rate = parseInt(document.getElementById("cfg_baud_a").value, 10);
-  if (document.getElementById("cfg_lockout_a")) {
-    cfg.scanner_a.lockout_method = document.getElementById("cfg_lockout_a").value;
-  }
+  cfg.scanner_a.lockout_method = document.getElementById("cfg_lockout_a").value;
 
-  cfg.scanner_b.model = document.getElementById("cfg_model_b").value;
+  cfg.scanner_b.enabled = document.getElementById("cfg_enabled_b").checked;
   cfg.scanner_b.connection_mode = document.getElementById("cfg_mode_b").value;
-  cfg.scanner_b.port = getSelectedPort('b');
-  cfg.scanner_b.baud_rate = parseInt(document.getElementById("cfg_baud_b").value, 10);
-  if (document.getElementById("cfg_lockout_b")) {
-    cfg.scanner_b.lockout_method = document.getElementById("cfg_lockout_b").value;
+  const epB = getSelectedPortOrHost('b');
+  if (epB.isIp) {
+    cfg.scanner_b.ip_host = epB.value;
+  } else {
+    cfg.scanner_b.port = epB.value;
   }
+  cfg.scanner_b.baud_rate = parseInt(document.getElementById("cfg_baud_b").value, 10);
+  cfg.scanner_b.lockout_method = document.getElementById("cfg_lockout_b").value;
 
-  // Scanner A Audio
-  const audDevA = document.getElementById("cfg_audio_dev_a").value;
-  cfg.scanner_a.audio_enabled = (audDevA !== "DISABLED");
-  cfg.scanner_a.audio_device_index = (audDevA === "DISABLED" || audDevA === "") ? null : parseInt(audDevA, 10);
+  // Audio Capture Selections (Name-first)
+  const audA = extractAudioSelection(document.getElementById("cfg_audio_dev_a"));
+  cfg.scanner_a.audio_enabled = audA.enabled;
+  cfg.scanner_a.audio_device_index = audA.index;
+  cfg.scanner_a.audio_device_name = audA.name;
   cfg.scanner_a.audio_channel = document.getElementById("cfg_audio_ch_a").value;
 
-  // Scanner B Audio
-  const audDevB = document.getElementById("cfg_audio_dev_b").value;
-  cfg.scanner_b.audio_enabled = (audDevB !== "DISABLED");
-  cfg.scanner_b.audio_device_index = (audDevB === "DISABLED" || audDevB === "") ? null : parseInt(audDevB, 10);
+  const audB = extractAudioSelection(document.getElementById("cfg_audio_dev_b"));
+  cfg.scanner_b.audio_enabled = audB.enabled;
+  cfg.scanner_b.audio_device_index = audB.index;
+  cfg.scanner_b.audio_device_name = audB.name;
   cfg.scanner_b.audio_channel = document.getElementById("cfg_audio_ch_b").value;
 
-  // Scanner A Templates
-  if (document.getElementById("cfg_filename_template_a")) {
-    cfg.scanner_a.filename_template = document.getElementById("cfg_filename_template_a").value.trim() || "%DT - %S - %C (%TG)";
-  }
-  if (document.getElementById("cfg_tit2_template_a")) {
-    cfg.scanner_a.tit2_template = document.getElementById("cfg_tit2_template_a").value.trim() || "%C (%TG)";
-  }
-
-  // Scanner B Templates
-  if (document.getElementById("cfg_filename_template_b")) {
-    cfg.scanner_b.filename_template = document.getElementById("cfg_filename_template_b").value.trim() || "%DT - %S - %C (%TG)";
-  }
-  if (document.getElementById("cfg_tit2_template_b")) {
-    cfg.scanner_b.tit2_template = document.getElementById("cfg_tit2_template_b").value.trim() || "%C (%TG)";
-  }
+  // Templates
+  cfg.scanner_a.filename_template = document.getElementById("cfg_filename_template_a").value.trim() || "%DT - %S - %C (%TG)";
+  cfg.scanner_a.tit2_template = document.getElementById("cfg_tit2_template_a").value.trim() || "%C (%TG)";
+  cfg.scanner_b.filename_template = document.getElementById("cfg_filename_template_b").value.trim() || "%DT - %S - %C (%TG)";
+  cfg.scanner_b.tit2_template = document.getElementById("cfg_tit2_template_b").value.trim() || "%C (%TG)";
 
   if (cfg.feeder) {
-    cfg.feeder.feeder_mode = document.getElementById("cfg_feeder_mode").value;
+    cfg.feeder.feeder_mode = "DIRECTORY_DROP";
     cfg.feeder.audio_format = document.getElementById("cfg_feeder_format").value;
-    if (document.getElementById("cfg_feeder_sample_rate")) {
-      cfg.feeder.sample_rate = parseInt(document.getElementById("cfg_feeder_sample_rate").value, 10);
+    cfg.feeder.sample_rate = parseInt(document.getElementById("cfg_feeder_sample_rate").value, 10);
+    const outDirEl = document.getElementById("cfg_output_dir");
+    if (outDirEl) {
+      cfg.feeder.inbox_directory = outDirEl.value.trim();
     }
-    cfg.feeder.inbox_directory = document.getElementById("cfg_feeder_inbox").value;
-    if (document.getElementById("cfg_feeder_webhook")) {
-      cfg.feeder.webhook_url = document.getElementById("cfg_feeder_webhook").value.trim() || "http://127.0.0.1:5000/api/ingest";
-    }
-    if (document.getElementById("cfg_feeder_proscan_tags")) {
-      cfg.feeder.enable_proscan_tags = document.getElementById("cfg_feeder_proscan_tags").checked;
-    }
-    if (document.getElementById("cfg_feeder_sidecar_json")) {
-      cfg.feeder.enable_sidecar_json = document.getElementById("cfg_feeder_sidecar_json").checked;
-    }
+    cfg.feeder.enable_proscan_tags = document.getElementById("cfg_feeder_proscan_tags").checked;
+    cfg.feeder.enable_sidecar_json = document.getElementById("cfg_feeder_sidecar_json").checked;
   }
 
   fetch('/api/config', {
@@ -1113,27 +1107,28 @@ function saveConfiguration(event) {
   });
 }
 
-function loadAudioDevices(callback) {
-  fetch('/api/audio/devices')
+function loadAudioDevices(forceRefresh) {
+  const qs = forceRefresh ? "?refresh=true" : "";
+  fetch(`/api/audio/devices${qs}`)
     .then(res => res.json())
     .then(data => {
       if (data.status === "success") {
         availableAudioDevices = data.devices || [];
         populateAudioDeviceDropdowns();
-        if (callback) callback();
       }
     })
     .catch(err => console.error("Failed to load audio devices:", err));
 }
 
-function loadAudioOutputDevices(notifyUser) {
-  fetch('/api/audio/output_devices')
+function loadAudioOutputDevices(forceRefresh) {
+  const qs = forceRefresh ? "?refresh=true" : "";
+  fetch(`/api/audio/output_devices${qs}`)
     .then(res => res.json())
     .then(data => {
       if (data.status === "success") {
         availableOutputDevices = data.devices || [];
         populateAudioOutputDropdown();
-        if (notifyUser) {
+        if (forceRefresh) {
           alert(`Refreshed output speakers!\nFound ${availableOutputDevices.length} output device(s).`);
         }
       }
@@ -1141,21 +1136,56 @@ function loadAudioOutputDevices(notifyUser) {
     .catch(err => console.error("Failed to load audio output devices:", err));
 }
 
+function escapeHtmlAttr(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function selectDeviceOptionByNameOrIndex(sel, devName, devIdx, defaultVal) {
+  if (!sel) return;
+  const opts = [...sel.options];
+  if (devName) {
+    const byName = opts.find(o => o.dataset.name === devName);
+    if (byName) {
+      sel.value = byName.value;
+      return;
+    }
+  }
+  if (devIdx !== null && devIdx !== undefined) {
+    const idxStr = String(devIdx);
+    if (opts.some(o => o.value === idxStr)) {
+      sel.value = idxStr;
+      return;
+    }
+  }
+  if (defaultVal !== undefined && opts.some(o => o.value === defaultVal)) {
+    sel.value = defaultVal;
+  }
+}
+
 function populateAudioOutputDropdown() {
   const sel = document.getElementById("loopbackOutputSelect");
   if (!sel) return;
 
-  const curIdx = currentAppState && currentAppState.config && currentAppState.config.audio_loopback
-    ? currentAppState.config.audio_loopback.output_device_index
-    : null;
+  const lbCfg = (currentAppState && currentAppState.config && currentAppState.config.audio_loopback) || {};
+  const curName = lbCfg.output_device_name || null;
+  const curIdx = lbCfg.output_device_index;
 
-  let html = `<option value="" ${(curIdx === null || curIdx === undefined) ? "selected" : ""}>Default System Output Speaker</option>`;
+  let html = `<option value="">Default System Output Speaker</option>`;
+  let matchedByName = false;
   availableOutputDevices.forEach(d => {
-    const selected = (curIdx !== null && curIdx !== undefined && parseInt(curIdx, 10) === d.index) ? "selected" : "";
     const isDef = d.is_default ? " (System Default)" : "";
-    html += `<option value="${d.index}" ${selected}>[${d.index}] ${d.name}${isDef}</option>`;
+    if (curName && d.name === curName) matchedByName = true;
+    html += `<option value="${d.index}" data-name="${escapeHtmlAttr(d.name)}">[${d.index}] ${escapeHtmlAttr(d.name)}${isDef}</option>`;
   });
+  if (curName && !matchedByName) {
+    html += `<option value="NAME:${escapeHtmlAttr(curName)}" data-name="${escapeHtmlAttr(curName)}" selected>${escapeHtmlAttr(curName)} (Configured)</option>`;
+  }
   sel.innerHTML = html;
+  selectDeviceOptionByNameOrIndex(sel, curName, curIdx, "");
 }
 
 function populateAudioDeviceDropdowns() {
@@ -1163,22 +1193,38 @@ function populateAudioDeviceDropdowns() {
   const selB = document.getElementById("cfg_audio_dev_b");
   if (!selA || !selB) return;
 
-  function buildAudioOptions(currentVal, isEnabled) {
+  function buildAudioOptions(curName, curIdx, isEnabled) {
     let html = `<option value="DISABLED" ${!isEnabled ? "selected" : ""}>Disabled / No Audio Capture</option>`;
-    html += `<option value="" ${isEnabled && (currentVal === null || currentVal === undefined) ? "selected" : ""}>Default System Audio Input</option>`;
+    html += `<option value="">Default System Audio Input</option>`;
+    let matchedByName = false;
     availableAudioDevices.forEach(d => {
-      const selected = (isEnabled && currentVal !== null && currentVal !== undefined && parseInt(currentVal, 10) === d.index) ? "selected" : "";
       const isDef = d.is_default ? " (System Default)" : "";
-      html += `<option value="${d.index}" ${selected}>${d.name} (${d.channels} ch)${isDef}</option>`;
+      if (curName && d.name === curName) matchedByName = true;
+      html += `<option value="${d.index}" data-name="${escapeHtmlAttr(d.name)}">${escapeHtmlAttr(d.name)} (${d.channels} ch)${isDef}</option>`;
     });
+    if (curName && !matchedByName) {
+      html += `<option value="NAME:${escapeHtmlAttr(curName)}" data-name="${escapeHtmlAttr(curName)}">${escapeHtmlAttr(curName)} (Configured)</option>`;
+    }
     return html;
   }
 
-  const cfgA = currentAppState && currentAppState.config ? currentAppState.config.scanner_a : {};
-  const cfgB = currentAppState && currentAppState.config ? currentAppState.config.scanner_b : {};
+  const cfgA = (currentAppState && currentAppState.config && currentAppState.config.scanner_a) || {};
+  const cfgB = (currentAppState && currentAppState.config && currentAppState.config.scanner_b) || {};
 
-  selA.innerHTML = buildAudioOptions(cfgA.audio_device_index, cfgA.audio_enabled !== false);
-  selB.innerHTML = buildAudioOptions(cfgB.audio_device_index, cfgB.audio_enabled !== false);
+  selA.innerHTML = buildAudioOptions(cfgA.audio_device_name, cfgA.audio_device_index, cfgA.audio_enabled !== false);
+  selB.innerHTML = buildAudioOptions(cfgB.audio_device_name, cfgB.audio_device_index, cfgB.audio_enabled !== false);
+
+  if (cfgA.audio_enabled === false) {
+    selA.value = "DISABLED";
+  } else {
+    selectDeviceOptionByNameOrIndex(selA, cfgA.audio_device_name, cfgA.audio_device_index, "");
+  }
+
+  if (cfgB.audio_enabled === false) {
+    selB.value = "DISABLED";
+  } else {
+    selectDeviceOptionByNameOrIndex(selB, cfgB.audio_device_name, cfgB.audio_device_index, "");
+  }
 
   const chA = document.getElementById("cfg_audio_ch_a");
   const chB = document.getElementById("cfg_audio_ch_b");
@@ -1186,28 +1232,10 @@ function populateAudioDeviceDropdowns() {
   if (chB && cfgB.audio_channel) chB.value = cfgB.audio_channel;
 }
 
-function testScanScribeFeeder(scannerId) {
-  const targetId = scannerId || 'scanner_a';
-  fetch('/api/feeder/dispatch_test', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scanner_id: targetId })
-  })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === "success" && data.dispatch_result && data.dispatch_result.status === "success") {
-        alert(`Dispatched Test Audio Feed [${targetId.toUpperCase()}] to ScanScribe Inbox!\nAudio: ${data.dispatch_result.audio_file}`);
-      } else {
-        alert(`Feeder Dispatch Result [${targetId.toUpperCase()}]: ${JSON.stringify(data.dispatch_result)}`);
-      }
-    });
-}
-
 window.addEventListener("DOMContentLoaded", () => {
   renderSpecifiersReference();
   connectWebSocket();
-  loadModelsCatalog();
   loadAvailableComPorts();
-  loadAudioDevices();
+  loadAudioDevices(false);
   loadAudioOutputDevices(false);
 });

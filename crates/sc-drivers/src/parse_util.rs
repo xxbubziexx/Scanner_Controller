@@ -2,6 +2,25 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use sc_core::ScannerStatus;
+
+/// Resets all active call/frequency metadata fields and sets `status_line` for an inactive scanner
+/// (e.g. `"DISABLED"` or `"NO PORT (SELECT IN SETTINGS)"`).
+pub fn set_inactive_status(status: &mut ScannerStatus, status_line: &str) {
+    status.connected = false;
+    status.receiving = false;
+    status.avoided = false;
+    status.rssi = 0;
+    status.tgid = None;
+    status.frequency = None;
+    status.unit_id = None;
+    status.tone = None;
+    status.system_name.clear();
+    status.dept_name.clear();
+    status.channel_name.clear();
+    status.status_line = status_line.to_string();
+}
+
 /// Extracts the payload of a specific command tag from a CR/LF-delimited pipelined response.
 ///
 /// Matches `(?:^|[\r\n]){key}(.*?)(?:[\r\n]|$)` (e.g. `extract_section(resp, "GLG,")` finds

@@ -11,8 +11,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use chrono::{Local, TimeZone};
 pub use sc_audio::resample_pcm_int16;
 use sc_audio::{CompletedCall, DispatchCallback, ScannerAudioRecorder};
-use sc_core::{AppConfig, ExclusionMode, PriorityMode, ScannerStatus, ALLOWED_SAMPLE_RATES};
-use sc_drivers::{create_hardware_driver, AnyScannerDriver, HardwareTransport, Transport};
+use sc_core::{
+    AppConfig, ExclusionMode, PriorityMode, ScannerConfig, ScannerModel, ScannerStatus,
+    ALLOWED_SAMPLE_RATES,
+};
+use sc_drivers::{
+    create_hardware_driver, driver_family_for_model, poll_slot_with_autodetect, AnyScannerDriver,
+    HardwareTransport, Transport,
+};
 use sc_feeder::{CallTransmissionPayload, DispatchResult, ScanScribeFeeder};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, watch};
@@ -479,6 +485,60 @@ pub fn build_dispatch_payload(
     }
 }
 
+type DriverFactory<T> = Arc<dyn Fn(ScannerConfig) -> AnyScannerDriver<T> + Send + Sync>;
+
+fn mark_status_disabled(status: &mut ScannerStatus) {
+    status.connected = false;
+    status.receiving = false;
+    status.avoided = false;
+    status.rssi = 0;
+    status.tgid = None;
+    status.frequency = None;
+    status.unit_id = None;
+    status.tone = None;
+    status.system_name.clear();
+    status.dept_name.clear();
+    status.channel_name.clear();
+    status.status_line = "DISABLED".to_string();
+}
+
+fn apply_detected_model(
+    cfg_arc: &Arc<Mutex<AppConfig>>,
+    feeder_arc: &Arc<Mutex<ScanScribeFeeder>>,
+    scanner_id: &str,
+    detected: ScannerModel,
+) {
+    let updated_map = if let Ok(mut cfg) = cfg_arc.lock() {
+        if scanner_id == "scanner_a" {
+            cfg.scanner_a.model = detected;
+        } else {
+            cfg.scanner_b.model = detected;
+        }
+        let mut map = HashMap::new();
+        map.insert("scanner_a".to_string(), cfg.scanner_a.clone());
+        map.insert("scanner_b".to_string(), cfg.scanner_b.clone());
+        Some(map)
+    } else {
+        None
+    };
+
+    if let Some(map) = updated_map {
+        if let Ok(mut fdr) = feeder_arc.lock() {
+            fdr.update_scanner_configs(map);
+        }
+    }
+}
+
+fn scanner_driver_settings_changed(old: &ScannerConfig, new: &ScannerConfig) -> bool {
+    old.enabled != new.enabled
+        || old.connection_mode != new.connection_mode
+        || old.port != new.port
+        || old.baud_rate != new.baud_rate
+        || old.ip_host != new.ip_host
+        || old.ip_port != new.ip_port
+        || driver_family_for_model(old.model) != driver_family_for_model(new.model)
+}
+
 /// Dual-scanner synchronization and recording engine (`engine/sync_manager.py:58-419`).
 ///
 /// Supports both generic transports (such as [`sc_drivers::ReplayTransport`] for deterministic
@@ -487,6 +547,7 @@ pub struct SyncManager<T: Transport = HardwareTransport> {
     config: Arc<Mutex<AppConfig>>,
     pub scanner_a: Arc<Mutex<Option<AnyScannerDriver<T>>>>,
     pub scanner_b: Arc<Mutex<Option<AnyScannerDriver<T>>>>,
+    driver_builder: Option<DriverFactory<T>>,
     status_a: Arc<Mutex<ScannerStatus>>,
     status_b: Arc<Mutex<ScannerStatus>>,
     state_machine: Arc<Mutex<ExclusionStateMachine>>,
@@ -506,7 +567,9 @@ impl SyncManager<HardwareTransport> {
     pub fn new_hardware(config: AppConfig) -> Self {
         let drv_a = create_hardware_driver(config.scanner_a.clone());
         let drv_b = create_hardware_driver(config.scanner_b.clone());
-        Self::with_drivers(config, Some(drv_a), Some(drv_b))
+        let mut mgr = Self::with_drivers(config, Some(drv_a), Some(drv_b));
+        mgr.driver_builder = Some(Arc::new(create_hardware_driver));
+        mgr
     }
 }
 
@@ -529,8 +592,7 @@ impl<T: Transport + 'static> SyncManager<T> {
             |d| d.status().clone(),
         );
         if !config.scanner_a.enabled {
-            initial_status_a.status_line = "DISABLED".to_string();
-            initial_status_a.connected = false;
+            mark_status_disabled(&mut initial_status_a);
         }
 
         let mut initial_status_b = driver_b.as_ref().map_or_else(
@@ -544,8 +606,7 @@ impl<T: Transport + 'static> SyncManager<T> {
             |d| d.status().clone(),
         );
         if !config.scanner_b.enabled {
-            initial_status_b.status_line = "DISABLED".to_string();
-            initial_status_b.connected = false;
+            mark_status_disabled(&mut initial_status_b);
         }
 
         let mut sc_configs = HashMap::new();
@@ -606,6 +667,7 @@ impl<T: Transport + 'static> SyncManager<T> {
             config: cfg_arc,
             scanner_a: Arc::new(Mutex::new(driver_a)),
             scanner_b: Arc::new(Mutex::new(driver_b)),
+            driver_builder: None,
             status_a: Arc::new(Mutex::new(initial_status_a)),
             status_b: Arc::new(Mutex::new(initial_status_b)),
             state_machine: Arc::new(Mutex::new(ExclusionStateMachine::new())),
@@ -712,26 +774,78 @@ impl<T: Transport + 'static> SyncManager<T> {
         tracing::info!(enabled, "Master call audio recording toggled");
     }
 
-    /// Hot-reloads configuration without restarting audio streams unless audio devices,
-    /// channels, or enable flags changed (`Plan/phase_4_engine_and_feeder.md` §1).
-    #[allow(clippy::needless_pass_by_value)]
+    /// Hot-reloads configuration, updating hardware drivers cleanly if ports/enable flags changed
+    /// and restarting audio streams only if audio devices, channels, loopback, or enable flags changed.
+    #[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
     pub fn update_config(&self, new_config: AppConfig) {
-        let audio_restart_needed = self.config.lock().map_or(true, |old| {
-            old.scanner_a.audio_device_index != new_config.scanner_a.audio_device_index
-                || old.scanner_a.audio_device_name != new_config.scanner_a.audio_device_name
-                || old.scanner_a.audio_channel != new_config.scanner_a.audio_channel
-                || (old.scanner_a.enabled && old.scanner_a.audio_enabled)
-                    != (new_config.scanner_a.enabled && new_config.scanner_a.audio_enabled)
-                || old.scanner_b.audio_device_index != new_config.scanner_b.audio_device_index
-                || old.scanner_b.audio_device_name != new_config.scanner_b.audio_device_name
-                || old.scanner_b.audio_channel != new_config.scanner_b.audio_channel
-                || (old.scanner_b.enabled && old.scanner_b.audio_enabled)
-                    != (new_config.scanner_b.enabled && new_config.scanner_b.audio_enabled)
-        });
+        let (driver_a_changed, driver_b_changed, audio_restart_needed) =
+            self.config.lock().map_or((true, true, true), |old| {
+                let da = scanner_driver_settings_changed(&old.scanner_a, &new_config.scanner_a);
+                let db = scanner_driver_settings_changed(&old.scanner_b, &new_config.scanner_b);
+                let audio = old.scanner_a.audio_device_index != new_config.scanner_a.audio_device_index
+                    || old.scanner_a.audio_device_name != new_config.scanner_a.audio_device_name
+                    || old.scanner_a.audio_channel != new_config.scanner_a.audio_channel
+                    || (old.scanner_a.enabled && old.scanner_a.audio_enabled)
+                        != (new_config.scanner_a.enabled && new_config.scanner_a.audio_enabled)
+                    || old.scanner_b.audio_device_index != new_config.scanner_b.audio_device_index
+                    || old.scanner_b.audio_device_name != new_config.scanner_b.audio_device_name
+                    || old.scanner_b.audio_channel != new_config.scanner_b.audio_channel
+                    || (old.scanner_b.enabled && old.scanner_b.audio_enabled)
+                        != (new_config.scanner_b.enabled && new_config.scanner_b.audio_enabled)
+                    || old.audio_loopback.enabled != new_config.audio_loopback.enabled
+                    || old.audio_loopback.output_device_index
+                        != new_config.audio_loopback.output_device_index
+                    || old.audio_loopback.output_device_name
+                        != new_config.audio_loopback.output_device_name;
+                (da, db, audio)
+            });
 
         if let Ok(mut cfg) = self.config.lock() {
             *cfg = new_config.clone();
         }
+
+        if driver_a_changed {
+            if let Ok(mut guard_a) = self.scanner_a.lock() {
+                if let Some(old_drv) = guard_a.as_mut() {
+                    old_drv.disconnect();
+                }
+                if let Some(ref build) = self.driver_builder {
+                    let fresh = build(new_config.scanner_a.clone());
+                    let st = fresh.status().clone();
+                    *guard_a = Some(fresh);
+                    if let Ok(mut sa) = self.status_a.lock() {
+                        *sa = st;
+                    }
+                }
+            }
+            if !new_config.scanner_a.enabled {
+                if let Ok(mut sa) = self.status_a.lock() {
+                    mark_status_disabled(&mut sa);
+                }
+            }
+        }
+
+        if driver_b_changed {
+            if let Ok(mut guard_b) = self.scanner_b.lock() {
+                if let Some(old_drv) = guard_b.as_mut() {
+                    old_drv.disconnect();
+                }
+                if let Some(ref build) = self.driver_builder {
+                    let fresh = build(new_config.scanner_b.clone());
+                    let st = fresh.status().clone();
+                    *guard_b = Some(fresh);
+                    if let Ok(mut sb) = self.status_b.lock() {
+                        *sb = st;
+                    }
+                }
+            }
+            if !new_config.scanner_b.enabled {
+                if let Ok(mut sb) = self.status_b.lock() {
+                    mark_status_disabled(&mut sb);
+                }
+            }
+        }
+
         if let Ok(mut fdr) = self.feeder.lock() {
             fdr.update_config(new_config.feeder.clone());
             let mut map = HashMap::new();
@@ -752,6 +866,7 @@ impl<T: Transport + 'static> SyncManager<T> {
             rec.set_recording_enabled(new_config.feeder.enable_feeder);
             if audio_restart_needed {
                 Self::apply_audio_stream_config(&mut rec, &new_config);
+                rec.restart_if_running();
             }
         }
         let _ = self.state_tx.send(self.get_full_state());
@@ -764,39 +879,44 @@ impl<T: Transport + 'static> SyncManager<T> {
     /// never discards the status or stalls mutual-exclusion/recording for the healthy scanner.
     #[must_use]
     pub fn poll_once_sync(&self, now: f64) -> EngineStateSnapshot {
-        let cfg = self.config.lock().map(|c| c.clone()).unwrap_or_default();
+        let (enabled_a, enabled_b) = self
+            .config
+            .lock()
+            .map_or((true, true), |c| (c.scanner_a.enabled, c.scanner_b.enabled));
 
         // 1. Poll Scanner A independently if enabled
-        if !cfg.scanner_a.enabled {
+        if !enabled_a {
             if let Ok(mut sa) = self.status_a.lock() {
-                sa.connected = false;
-                sa.receiving = false;
-                sa.status_line = "DISABLED".to_string();
+                mark_status_disabled(&mut sa);
             }
         } else if let Ok(mut drv_a_guard) = self.scanner_a.lock() {
-            if let Some(drv_a) = drv_a_guard.as_mut() {
-                let st_a = drv_a.poll().clone();
+            if let Some((st_a, detected_a)) = poll_slot_with_autodetect(&mut drv_a_guard) {
                 if let Ok(mut sa) = self.status_a.lock() {
                     *sa = st_a;
+                }
+                if let Some(detected) = detected_a {
+                    apply_detected_model(&self.config, &self.feeder, "scanner_a", detected);
                 }
             }
         }
 
         // 2. Poll Scanner B independently if enabled
-        if !cfg.scanner_b.enabled {
+        if !enabled_b {
             if let Ok(mut sb) = self.status_b.lock() {
-                sb.connected = false;
-                sb.receiving = false;
-                sb.status_line = "DISABLED".to_string();
+                mark_status_disabled(&mut sb);
             }
         } else if let Ok(mut drv_b_guard) = self.scanner_b.lock() {
-            if let Some(drv_b) = drv_b_guard.as_mut() {
-                let st_b = drv_b.poll().clone();
+            if let Some((st_b, detected_b)) = poll_slot_with_autodetect(&mut drv_b_guard) {
                 if let Ok(mut sb) = self.status_b.lock() {
                     *sb = st_b;
                 }
+                if let Some(detected) = detected_b {
+                    apply_detected_model(&self.config, &self.feeder, "scanner_b", detected);
+                }
             }
         }
+
+        let cfg = self.config.lock().map(|c| c.clone()).unwrap_or_default();
         let sa = self.status_a.lock().map_or_else(
             |_| ScannerStatus::new("scanner_a", "Scanner A", "BCD436HP"),
             |s| s.clone(),
@@ -967,6 +1087,7 @@ impl<T: Transport + 'static> SyncManager<T> {
         let status_b = Arc::clone(&self.status_b);
         let sm_arc = Arc::clone(&self.state_machine);
         let rec_arc = Arc::clone(&self.audio_recorder);
+        let fdr_arc = Arc::clone(&self.feeder);
         let state_tx = self.state_tx.clone();
 
         self.tasks.spawn(async move {
@@ -988,18 +1109,20 @@ impl<T: Transport + 'static> SyncManager<T> {
                         // Poll Scanner A and Scanner B on independent blocking threads
                         let drv_a_c = Arc::clone(&scanner_a);
                         let st_a_c = Arc::clone(&status_a);
+                        let cfg_a_c = Arc::clone(&cfg_arc);
+                        let fdr_a_c = Arc::clone(&fdr_arc);
                         let task_a = tokio::task::spawn_blocking(move || {
                             if !enabled_a {
                                 if let Ok(mut out) = st_a_c.lock() {
-                                    out.connected = false;
-                                    out.receiving = false;
-                                    out.status_line = "DISABLED".to_string();
+                                    mark_status_disabled(&mut out);
                                 }
                             } else if let Ok(mut g) = drv_a_c.lock() {
-                                if let Some(drv) = g.as_mut() {
-                                    let s = drv.poll().clone();
+                                if let Some((s, detected_opt)) = poll_slot_with_autodetect(&mut g) {
                                     if let Ok(mut out) = st_a_c.lock() {
                                         *out = s;
+                                    }
+                                    if let Some(detected) = detected_opt {
+                                        apply_detected_model(&cfg_a_c, &fdr_a_c, "scanner_a", detected);
                                     }
                                 }
                             }
@@ -1007,18 +1130,20 @@ impl<T: Transport + 'static> SyncManager<T> {
 
                         let drv_b_c = Arc::clone(&scanner_b);
                         let st_b_c = Arc::clone(&status_b);
+                        let cfg_b_c = Arc::clone(&cfg_arc);
+                        let fdr_b_c = Arc::clone(&fdr_arc);
                         let task_b = tokio::task::spawn_blocking(move || {
                             if !enabled_b {
                                 if let Ok(mut out) = st_b_c.lock() {
-                                    out.connected = false;
-                                    out.receiving = false;
-                                    out.status_line = "DISABLED".to_string();
+                                    mark_status_disabled(&mut out);
                                 }
                             } else if let Ok(mut g) = drv_b_c.lock() {
-                                if let Some(drv) = g.as_mut() {
-                                    let s = drv.poll().clone();
+                                if let Some((s, detected_opt)) = poll_slot_with_autodetect(&mut g) {
                                     if let Ok(mut out) = st_b_c.lock() {
                                         *out = s;
+                                    }
+                                    if let Some(detected) = detected_opt {
+                                        apply_detected_model(&cfg_b_c, &fdr_b_c, "scanner_b", detected);
                                     }
                                 }
                             }
@@ -1265,6 +1390,8 @@ mod tests {
         assert!(snap.scanner_a.connected);
         assert!(!snap.scanner_b.connected);
         assert_eq!(snap.scanner_b.status_line, "DISABLED");
+        assert!(snap.scanner_b.system_name.is_empty());
+        assert!(snap.scanner_b.channel_name.is_empty());
     }
 
     #[test]

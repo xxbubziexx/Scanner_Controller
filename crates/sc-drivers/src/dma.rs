@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use sc_core::{normalize_frequency, ScannerConfig, ScannerStatus};
 use tracing::{error, info, warn};
 
-use crate::parse_util::{extract_section, now_unix_seconds};
+use crate::parse_util::{extract_section, now_unix_seconds, set_inactive_status};
 use crate::transport::Transport;
 
 /// Pipelined multi-command poll string for DMA series scanners (`RadioSpecific.cs:1042`).
@@ -193,7 +193,11 @@ impl<T: Transport> DmaDriver<T> {
     #[must_use]
     pub fn new(config: ScannerConfig, transport: T) -> Self {
         let mut status = ScannerStatus::new(&config.id, &config.name, config.model.as_str());
-        status.connected = transport.is_connected();
+        if config.enabled {
+            status.connected = transport.is_connected();
+        } else {
+            set_inactive_status(&mut status, "DISABLED");
+        }
         Self {
             config,
             status,
@@ -202,6 +206,28 @@ impl<T: Transport> DmaDriver<T> {
             connect_retry_interval: Duration::from_secs(4),
             logged_connection_error: false,
         }
+    }
+
+    /// Reconstructs a `DmaDriver` from parts while preserving an open transport during family switching.
+    #[must_use]
+    pub fn from_parts(config: ScannerConfig, mut status: ScannerStatus, transport: T) -> Self {
+        if !config.enabled {
+            set_inactive_status(&mut status, "DISABLED");
+        }
+        Self {
+            config,
+            status,
+            transport,
+            last_connect_attempt: None,
+            connect_retry_interval: Duration::from_secs(4),
+            logged_connection_error: false,
+        }
+    }
+
+    /// Consumes this driver, returning `(config, status, transport)` for zero-downtime family switching.
+    #[must_use]
+    pub fn into_parts(self) -> (ScannerConfig, ScannerStatus, T) {
+        (self.config, self.status, self.transport)
     }
 
     #[must_use]
@@ -218,6 +244,10 @@ impl<T: Transport> DmaDriver<T> {
         &self.config
     }
 
+    pub fn config_mut(&mut self) -> &mut ScannerConfig {
+        &mut self.config
+    }
+
     #[must_use]
     pub fn transport(&self) -> &T {
         &self.transport
@@ -230,15 +260,13 @@ impl<T: Transport> DmaDriver<T> {
     /// Checks whether the driver should attempt to connect right now (port configured + retry backoff elapsed).
     pub fn should_try_connect(&mut self) -> bool {
         if !self.config.enabled {
-            self.status.connected = false;
-            self.status.status_line = "DISABLED".to_string();
+            set_inactive_status(&mut self.status, "DISABLED");
             return false;
         }
 
         let port_val = self.config.port.trim().to_uppercase();
         if port_val.is_empty() || port_val == "NONE" || port_val == "DISABLED" {
-            self.status.connected = false;
-            self.status.status_line = "NO PORT (SELECT IN SETTINGS)".to_string();
+            set_inactive_status(&mut self.status, "NO PORT (SELECT IN SETTINGS)");
             return false;
         }
 

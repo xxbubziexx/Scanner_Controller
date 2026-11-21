@@ -16,9 +16,14 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::{SinkExt, StreamExt};
 use rust_embed::RustEmbed;
-use sc_audio::{list_audio_input_devices, list_audio_output_devices};
+use sc_audio::{
+    list_audio_input_devices, list_audio_input_devices_cached, list_audio_output_devices,
+    list_audio_output_devices_cached, AudioDeviceInfo,
+};
 use sc_core::{AppConfig, ConnectionMode, PriorityMode, ScanScribeFeederConfig, ScannerModel};
-use sc_discovery::{detect_serial_ports, discover_lan_scanners, list_available_ports};
+use sc_discovery::{
+    detect_serial_ports, discover_lan_scanners, list_available_ports, AvailablePortInfo,
+};
 use sc_drivers::{HardwareTransport, Transport};
 use sc_engine::{now_unix_secs, SyncManager};
 use sc_feeder::CallTransmissionPayload;
@@ -47,6 +52,7 @@ pub struct ServerState<T: Transport + Send + 'static> {
     pub sync_manager: Arc<AsyncMutex<SyncManager<T>>>,
     pub config_path: Option<PathBuf>,
     pub backed_up_once: AtomicBool,
+    pub started_at: std::time::Instant,
 }
 
 impl<T: Transport + Send + 'static> ServerState<T> {
@@ -57,6 +63,7 @@ impl<T: Transport + Send + 'static> ServerState<T> {
             sync_manager: Arc::new(AsyncMutex::new(sync_manager)),
             config_path,
             backed_up_once: AtomicBool::new(false),
+            started_at: std::time::Instant::now(),
         })
     }
 
@@ -82,30 +89,95 @@ impl<T: Transport + Send + 'static> ServerState<T> {
     }
 }
 
-/// Populates `audio_device_name` and `output_device_name` next to indices when saving (`Plan/phase_7_packaging_and_cutover.md` §2).
+fn sync_device_name_and_index(
+    devices: &[AudioDeviceInfo],
+    name: &mut Option<String>,
+    index: &mut Option<u32>,
+) {
+    if name.as_deref().is_some_and(|s| s.trim().is_empty()) {
+        *name = None;
+    }
+
+    if let Some(ref target_name) = *name {
+        let lower = target_name.to_ascii_lowercase();
+        if let Some(dev) = devices
+            .iter()
+            .find(|d| d.name == *target_name)
+            .or_else(|| {
+                devices
+                    .iter()
+                    .find(|d| d.name.to_ascii_lowercase().contains(&lower))
+            })
+        {
+            if let Ok(idx_u32) = u32::try_from(dev.index) {
+                *index = Some(idx_u32);
+            }
+        }
+        return;
+    }
+
+    if let Some(target_idx) = *index {
+        if let Some(dev) = devices.iter().find(|d| d.index == target_idx as usize) {
+            *name = Some(dev.name.clone());
+        }
+    }
+}
+
+fn enrich_scanner_model_from_ports(
+    ports: &[AvailablePortInfo],
+    scanner: &mut sc_core::ScannerConfig,
+) {
+    if !scanner.enabled || scanner.connection_mode != ConnectionMode::Serial {
+        return;
+    }
+    let port_trim = scanner.port.trim();
+    if port_trim.is_empty() || port_trim.eq_ignore_ascii_case("NONE") {
+        return;
+    }
+    let port_canon = std::fs::canonicalize(port_trim).ok();
+    let matched = ports.iter().find(|p| {
+        p.device.eq_ignore_ascii_case(port_trim)
+            || port_canon.as_ref().is_some_and(|pc| {
+                std::fs::canonicalize(&p.device)
+                    .ok()
+                    .is_some_and(|pd| &pd == pc)
+            })
+    });
+    if let Some(info) = matched {
+        if let Some(ref model_str) = info.detected_model {
+            if let Some(m) = ScannerModel::from_mdl_str(model_str) {
+                scanner.model = m;
+            }
+        }
+    }
+}
+
+/// Keeps `audio_device_name`/`output_device_name` synchronized with enumerated devices
+/// (`Plan/phase_7_packaging_and_cutover.md` §2) without clobbering saved names when temporarily absent.
 pub fn enrich_config_device_names(config: &mut AppConfig) {
     let inputs = list_audio_input_devices();
-    if let Some(idx_a) = config.scanner_a.audio_device_index {
-        if let Some(dev) = inputs.iter().find(|d| d.index == idx_a as usize) {
-            config.scanner_a.audio_device_name = Some(dev.name.clone());
-        }
-    }
-    if let Some(idx_b) = config.scanner_b.audio_device_index {
-        if let Some(dev) = inputs.iter().find(|d| d.index == idx_b as usize) {
-            config.scanner_b.audio_device_name = Some(dev.name.clone());
-        }
-    }
-    if let Some(idx_f) = config.feeder.audio_device_index {
-        if let Some(dev) = inputs.iter().find(|d| d.index == idx_f as usize) {
-            config.feeder.audio_device_name = Some(dev.name.clone());
-        }
-    }
-    if let Some(out_idx) = config.audio_loopback.output_device_index {
-        let outputs = list_audio_output_devices();
-        if let Some(dev) = outputs.iter().find(|d| d.index == out_idx as usize) {
-            config.audio_loopback.output_device_name = Some(dev.name.clone());
-        }
-    }
+    sync_device_name_and_index(
+        &inputs,
+        &mut config.scanner_a.audio_device_name,
+        &mut config.scanner_a.audio_device_index,
+    );
+    sync_device_name_and_index(
+        &inputs,
+        &mut config.scanner_b.audio_device_name,
+        &mut config.scanner_b.audio_device_index,
+    );
+    sync_device_name_and_index(
+        &inputs,
+        &mut config.feeder.audio_device_name,
+        &mut config.feeder.audio_device_index,
+    );
+
+    let outputs = list_audio_output_devices();
+    sync_device_name_and_index(
+        &outputs,
+        &mut config.audio_loopback.output_device_name,
+        &mut config.audio_loopback.output_device_index,
+    );
 }
 
 /// Builds the complete Axum [`Router`] with all REST, static, and WebSocket routes matching `server.py`.
@@ -165,7 +237,10 @@ fn serve_asset_bytes(rel_path: &str) -> Response {
             let mime = mime_guess::from_path(rel_path).first_or_octet_stream();
             return (
                 StatusCode::OK,
-                [(header::CONTENT_TYPE, mime.as_ref().to_string())],
+                [
+                    (header::CONTENT_TYPE, mime.as_ref().to_string()),
+                    (header::CACHE_CONTROL, "no-cache".to_string()),
+                ],
                 bytes,
             )
                 .into_response();
@@ -176,7 +251,10 @@ fn serve_asset_bytes(rel_path: &str) -> Response {
         let mime = mime_guess::from_path(rel_path).first_or_octet_stream();
         return (
             StatusCode::OK,
-            [(header::CONTENT_TYPE, mime.as_ref().to_string())],
+            [
+                (header::CONTENT_TYPE, mime.as_ref().to_string()),
+                (header::CACHE_CONTROL, "no-cache".to_string()),
+            ],
             content.data.into_owned(),
         )
             .into_response();
@@ -213,12 +291,15 @@ async fn handle_health_check<T: Transport + Send + 'static>(
     let full = mgr.get_full_state();
     Json(json!({
         "status": "healthy",
+        "uptime_seconds": state.started_at.elapsed().as_secs(),
         "scanner_a": {
             "connected": full.scanner_a.connected,
+            "model": full.scanner_a.model,
             "status_line": full.scanner_a.status_line
         },
         "scanner_b": {
             "connected": full.scanner_b.connected,
+            "model": full.scanner_b.model,
             "status_line": full.scanner_b.status_line
         }
     }))
@@ -228,6 +309,13 @@ async fn handle_update_config<T: Transport + Send + 'static>(
     State(state): State<Arc<ServerState<T>>>,
     Json(mut new_config): Json<AppConfig>,
 ) -> Json<Value> {
+    if state.config_path.is_some() {
+        let ports = tokio::task::spawn_blocking(list_available_ports)
+            .await
+            .unwrap_or_default();
+        enrich_scanner_model_from_ports(&ports, &mut new_config.scanner_a);
+        enrich_scanner_model_from_ports(&ports, &mut new_config.scanner_b);
+    }
     state.save_config_if_configured(&mut new_config);
     let mgr = state.sync_manager.lock().await;
     mgr.update_config(new_config.clone());
@@ -310,20 +398,29 @@ async fn handle_manual_skip<T: Transport + Send + 'static>(
         .into_response()
 }
 
-async fn handle_audio_devices() -> Json<Value> {
-    let devices = tokio::task::spawn_blocking(list_audio_input_devices)
-        .await
-        .unwrap_or_default();
+#[derive(Debug, Default, Deserialize)]
+pub struct RefreshQuery {
+    pub refresh: Option<bool>,
+}
+
+async fn handle_audio_devices(Query(query): Query<RefreshQuery>) -> Json<Value> {
+    let force = query.refresh.unwrap_or(false);
+    let devices =
+        tokio::task::spawn_blocking(move || list_audio_input_devices_cached(force))
+            .await
+            .unwrap_or_default();
     Json(json!({
         "status": "success",
         "devices": devices
     }))
 }
 
-async fn handle_audio_output_devices() -> Json<Value> {
-    let devices = tokio::task::spawn_blocking(list_audio_output_devices)
-        .await
-        .unwrap_or_default();
+async fn handle_audio_output_devices(Query(query): Query<RefreshQuery>) -> Json<Value> {
+    let force = query.refresh.unwrap_or(false);
+    let devices =
+        tokio::task::spawn_blocking(move || list_audio_output_devices_cached(force))
+            .await
+            .unwrap_or_default();
     Json(json!({
         "status": "success",
         "devices": devices
@@ -607,6 +704,23 @@ async fn process_ws_command<T: Transport + Send + 'static>(
     }
 }
 
+#[cfg(target_os = "linux")]
+fn notify_systemd_ready() {
+    if let Some(socket_path) = std::env::var_os("NOTIFY_SOCKET") {
+        let s = socket_path.to_string_lossy();
+        if s.starts_with('@') {
+            tracing::debug!(socket = %s, "Abstract NOTIFY_SOCKET not supported via std");
+            return;
+        }
+        match std::os::unix::net::UnixDatagram::unbound()
+            .and_then(|sock| sock.send_to(b"READY=1\n", &socket_path))
+        {
+            Ok(_) => tracing::debug!("Notified systemd READY=1"),
+            Err(err) => tracing::warn!(error = %err, "Failed to send systemd READY=1"),
+        }
+    }
+}
+
 /// Starts the live hardware `SyncManager` and serves the Axum HTTP + WebSocket dashboard on `addr`,
 /// shutting down gracefully when `shutdown_token` is cancelled (`Plan/phase_5_server_and_shadow_run.md` §3).
 ///
@@ -626,6 +740,8 @@ pub async fn run_hardware_server(
     let app = build_router(Arc::clone(&state));
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    #[cfg(target_os = "linux")]
+    notify_systemd_ready();
     tracing::info!(
         address = %addr,
         "Uniden Scanner Controller Web Dashboard listening on http://{}",

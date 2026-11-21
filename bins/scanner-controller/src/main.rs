@@ -16,7 +16,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use sc_core::AppConfig;
-use sc_desktop::{run_desktop_app, DesktopShellConfig};
+use sc_desktop::{run_desktop_app, DesktopShellConfig, SingleInstanceGuard};
 use sc_discovery::{detect_serial_ports, discover_lan_scanners};
 use sc_drivers::normalize_port_name;
 use sc_server::run_hardware_server;
@@ -72,6 +72,14 @@ enum Commands {
         /// Do not automatically open the web browser on startup.
         #[arg(long)]
         no_browser: bool,
+
+        /// Single-instance loopback lock port (prevents duplicate processes contending for hardware).
+        #[arg(long, default_value_t = 45_891)]
+        lock_port: u16,
+
+        /// Disable the single-instance lock guard.
+        #[arg(long)]
+        no_lock: bool,
     },
 
     /// Probe serial COM/TTY ports (and optionally UDP LAN) for connected Uniden scanners.
@@ -154,13 +162,54 @@ fn try_open_browser(url: &str) {
     }
 }
 
+fn spawn_shutdown_watcher(shutdown_token: CancellationToken) {
+    tokio::spawn(async move {
+        #[cfg(unix)]
+        {
+            match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+                Ok(mut sigterm) => {
+                    tokio::select! {
+                        _ = tokio::signal::ctrl_c() => {
+                            tracing::info!("SIGINT/Ctrl+C received; initiating graceful shutdown...");
+                        }
+                        _ = sigterm.recv() => {
+                            tracing::info!("SIGTERM received; initiating graceful shutdown...");
+                        }
+                    }
+                }
+                Err(_) => {
+                    let _ = tokio::signal::ctrl_c().await;
+                    tracing::info!("Ctrl+C received; initiating graceful shutdown...");
+                }
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            if tokio::signal::ctrl_c().await.is_ok() {
+                tracing::info!("Ctrl+C received; initiating graceful shutdown...");
+            }
+        }
+        shutdown_token.cancel();
+    });
+}
+
 #[allow(clippy::print_stdout)]
 async fn run_serve(
     host: &str,
     port: u16,
     explicit_cfg: Option<PathBuf>,
     no_browser: bool,
+    lock_port: u16,
+    no_lock: bool,
 ) -> Result<()> {
+    let _instance_guard = if no_lock {
+        None
+    } else {
+        Some(SingleInstanceGuard::try_acquire(lock_port).with_context(|| {
+            format!("Another scanner-controller instance is already running (lock port {lock_port} busy)")
+        })?)
+    };
+
     let cfg_path = resolve_config_path(explicit_cfg);
     let config = if cfg_path.exists() {
         tracing::info!(path = %cfg_path.display(), "Loading configuration from disk");
@@ -178,13 +227,7 @@ async fn run_serve(
         .with_context(|| format!("Invalid bind address {host}:{port}"))?;
 
     let shutdown_token = CancellationToken::new();
-    let signal_token = shutdown_token.clone();
-    tokio::spawn(async move {
-        if tokio::signal::ctrl_c().await.is_ok() {
-            tracing::info!("Ctrl+C received; initiating graceful shutdown...");
-            signal_token.cancel();
-        }
-    });
+    spawn_shutdown_watcher(shutdown_token.clone());
 
     if !no_browser {
         let browser_host = if host == "0.0.0.0" { "127.0.0.1" } else { host };
@@ -218,13 +261,7 @@ async fn run_desktop(
     };
 
     let shutdown_token = CancellationToken::new();
-    let signal_token = shutdown_token.clone();
-    tokio::spawn(async move {
-        if tokio::signal::ctrl_c().await.is_ok() {
-            tracing::info!("Ctrl+C received; initiating graceful shutdown...");
-            signal_token.cancel();
-        }
-    });
+    spawn_shutdown_watcher(shutdown_token.clone());
 
     let shell_cfg = DesktopShellConfig {
         host: host.to_string(),
@@ -352,6 +389,11 @@ fn run_probe_keypad(raw_port: &str, baud: u32, keys: &[String]) -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("JACK_NO_START_SERVER").is_none() {
+        std::env::set_var("JACK_NO_START_SERVER", "1");
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -373,7 +415,9 @@ async fn main() -> Result<()> {
             port,
             config,
             no_browser,
-        }) => run_serve(&host, port, config, no_browser).await,
+            lock_port,
+            no_lock,
+        }) => run_serve(&host, port, config, no_browser, lock_port, no_lock).await,
         Some(Commands::Detect {
             lan,
             active_ports,

@@ -15,8 +15,9 @@ pub mod stream;
 pub mod vox;
 
 pub use devices::{
-    list_audio_input_devices, list_audio_output_devices, resolve_input_device,
-    resolve_output_device, AudioDeviceInfo,
+    list_audio_input_devices, list_audio_input_devices_cached, list_audio_output_devices,
+    list_audio_output_devices_cached, resolve_input_device, resolve_output_device,
+    resolved_device_name, AudioDeviceInfo,
 };
 pub use encoder::{
     encode_audio_for_dispatch, encode_mp3_raw_lame, encode_wav_with_metadata, is_valid_mp3_payload,

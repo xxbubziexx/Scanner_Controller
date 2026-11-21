@@ -109,6 +109,45 @@ impl<T: Transport> AnyScannerDriver<T> {
         }
     }
 
+    pub fn config_mut(&mut self) -> &mut ScannerConfig {
+        match self {
+            Self::HomePatrol(d) => d.config_mut(),
+            Self::Dma(d) => d.config_mut(),
+            Self::Classic(d) => d.config_mut(),
+        }
+    }
+
+    /// Consumes this driver, returning `(config, status, transport)` while keeping the transport open.
+    #[must_use]
+    pub fn into_parts(self) -> (ScannerConfig, ScannerStatus, T) {
+        match self {
+            Self::HomePatrol(d) => d.into_parts(),
+            Self::Dma(d) => d.into_parts(),
+            Self::Classic(d) => d.into_parts(),
+        }
+    }
+
+    /// Constructs the driver family matching `model` from existing `(config, status, transport)`.
+    #[must_use]
+    pub fn from_parts_for_model(
+        mut config: ScannerConfig,
+        mut status: ScannerStatus,
+        transport: T,
+        model: ScannerModel,
+    ) -> Self {
+        config.model = model;
+        status.model = model.as_str().to_string();
+        match driver_family_for_model(model) {
+            DriverFamily::HomePatrolSds => {
+                Self::HomePatrol(HpDriver::from_parts(config, status, transport))
+            }
+            DriverFamily::XtDma => Self::Dma(DmaDriver::from_parts(config, status, transport)),
+            DriverFamily::ClassicDn => {
+                Self::Classic(ClassicDriver::from_parts(config, status, transport))
+            }
+        }
+    }
+
     #[must_use]
     pub fn transport(&self) -> &T {
         match self {
@@ -250,4 +289,58 @@ pub fn create_hardware_driver(config: ScannerConfig) -> AnyScannerDriver<Hardwar
         }
     };
     create_driver_for_model(config, transport)
+}
+
+/// Polls `slot` and automatically updates the scanner model and driver family in-place
+/// if the connected hardware reports a different [`ScannerModel`] via `MDL` / `SI`.
+///
+/// Returns `(updated_status, Some(newly_detected_model))` when the model changed.
+pub fn poll_slot_with_autodetect<T: Transport>(
+    slot: &mut Option<AnyScannerDriver<T>>,
+) -> Option<(ScannerStatus, Option<ScannerModel>)> {
+    let (status, detected_opt) = {
+        let drv = slot.as_mut()?;
+        let st = drv.poll().clone();
+        let detected = ScannerModel::from_mdl_str(&st.model).filter(|&m| m != drv.config().model);
+        (st, detected)
+    };
+
+    let Some(detected) = detected_opt else {
+        return Some((status, None));
+    };
+
+    let mut updated_status = status;
+    updated_status.model = detected.as_str().to_string();
+    let current_family = slot.as_ref()?.family();
+    let target_family = driver_family_for_model(detected);
+
+    if current_family == target_family {
+        if let Some(drv) = slot.as_mut() {
+            drv.config_mut().model = detected;
+            drv.status_mut().model = detected.as_str().to_string();
+            info!(
+                scanner_id = %drv.config().id,
+                detected_model = %detected.as_str(),
+                "Auto-detected scanner model from COM port"
+            );
+        }
+    } else if let Some(old_drv) = slot.take() {
+        let (cfg, _old_st, transport) = old_drv.into_parts();
+        let scanner_id = cfg.id.clone();
+        let upgraded = AnyScannerDriver::from_parts_for_model(
+            cfg,
+            updated_status.clone(),
+            transport,
+            detected,
+        );
+        info!(
+            scanner_id = %scanner_id,
+            detected_model = %detected.as_str(),
+            ?target_family,
+            "Auto-detected scanner model from COM port; upgraded driver family in-place"
+        );
+        *slot = Some(upgraded);
+    }
+
+    Some((updated_status, Some(detected)))
 }

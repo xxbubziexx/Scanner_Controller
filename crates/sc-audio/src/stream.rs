@@ -4,18 +4,47 @@
 //! callback rules (zero allocation, zero locks, zero logging, zero syscalls inside `cpal` callbacks).
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{SampleFormat, StreamConfig};
 use sc_core::{AudioChannelMode, ScannerStatus};
 
-use crate::devices::{resolve_input_device, resolve_output_device};
+use crate::devices::{resolve_input_device, resolve_output_device, resolved_device_name};
 use crate::loopback::{fill_rt_output_callback, LoopbackMixer, PanMode, RtLoopbackShared};
 use crate::preroll::PreRollRingBuffer;
+
+fn sleep_interruptible(running: &AtomicBool, dur: Duration) {
+    let deadline = Instant::now() + dur;
+    while running.load(Ordering::Relaxed) {
+        let now = Instant::now();
+        if now >= deadline {
+            break;
+        }
+        let step = (deadline - now).min(Duration::from_millis(100));
+        thread::sleep(step);
+    }
+}
+
+fn make_stream_error_callback(
+    xrun_count: Arc<AtomicU64>,
+    err_count: Arc<AtomicU64>,
+    fatal_flag: Arc<AtomicBool>,
+) -> impl FnMut(cpal::Error) + Send + 'static {
+    move |err: cpal::Error| {
+        xrun_count.fetch_add(1, Ordering::Relaxed);
+        err_count.fetch_add(1, Ordering::Relaxed);
+        if matches!(
+            err.kind(),
+            cpal::ErrorKind::DeviceNotAvailable | cpal::ErrorKind::DeviceChanged
+        ) {
+            fatal_flag.store(true, Ordering::Relaxed);
+        }
+    }
+}
 
 /// Returns current UNIX epoch timestamp in seconds as `f64`.
 #[must_use]
@@ -149,7 +178,7 @@ pub fn push_rt_input_callback(
             match channel_mode {
                 AudioChannelMode::Left => frame[0],
                 AudioChannelMode::Right => frame[1],
-                AudioChannelMode::Mono => 0.5 * (frame[0] + frame[1]),
+                AudioChannelMode::Mono => f32::midpoint(frame[0], frame[1]),
             }
         } else {
             frame[0]
@@ -264,6 +293,7 @@ pub struct SingleScannerAudioStream {
     pub device_name: Option<String>,
     pub channel_mode: AudioChannelMode,
     pub sample_rate: u32,
+    active_sample_rate: Arc<AtomicU32>,
     pub hang_time_seconds: f64,
     pub min_duration_seconds: f64,
     pub enabled: bool,
@@ -303,6 +333,7 @@ impl SingleScannerAudioStream {
             device_name,
             channel_mode,
             sample_rate: sr,
+            active_sample_rate: Arc::new(AtomicU32::new(sr)),
             hang_time_seconds,
             min_duration_seconds,
             enabled,
@@ -376,7 +407,7 @@ impl SingleScannerAudioStream {
         }
     }
 
-    /// Starts the hardware `cpal` input stream and its dedicated worker thread.
+    /// Starts the hardware `cpal` input stream and its dedicated self-healing worker thread.
     #[allow(
         clippy::too_many_lines,
         clippy::cast_possible_truncation,
@@ -392,177 +423,262 @@ impl SingleScannerAudioStream {
             return;
         }
 
-        let Some(device) = resolve_input_device(self.device_name.as_deref(), self.device_index)
-        else {
-            tracing::warn!(
-                scanner_id = %self.scanner_id,
-                "No audio input device available; capture stream dormant"
-            );
-            return;
-        };
-
-        let Ok(default_cfg) = device.default_input_config() else {
-            tracing::warn!(
-                scanner_id = %self.scanner_id,
-                "Could not query default input config; capture stream dormant"
-            );
-            return;
-        };
-
-        let hw_rate = default_cfg.sample_rate().0;
-        let hw_channels = default_cfg.channels().clamp(1, 2);
-        let sample_format = default_cfg.sample_format();
-        self.sample_rate = hw_rate;
-
-        if let Ok(mut guard) = self.state.lock() {
-            guard.pre_buffer = PreRollRingBuffer::new((f64::from(hw_rate) * 2.0) as usize);
-        }
-
-        let ring_capacity = (hw_rate as usize) * 2;
-        let (mut producer, mut consumer) = rtrb::RingBuffer::<f32>::new(ring_capacity);
-
         let running_flag = Arc::clone(&self.running);
         running_flag.store(true, Ordering::SeqCst);
 
         let level_cb = Arc::clone(&self.live_level_pct);
         let xrun_cb = Arc::clone(&self.xrun_count);
-        let err_xrun = Arc::clone(&self.xrun_count);
         let ch_mode = self.channel_mode;
-        let ch_usize = usize::from(hw_channels);
         let dev_name = self.device_name.clone();
         let dev_idx = self.device_index;
+        let active_sr = Arc::clone(&self.active_sample_rate);
 
-        // Spawn dedicated worker thread to own the cpal::Stream (!Send on WASAPI) and drain the SPSC ring
+        // Spawn dedicated worker thread to own the cpal::Stream (!Send on WASAPI),
+        // retry on transient failures/disconnects, and drain the SPSC ring.
         let worker_running = Arc::clone(&self.running);
         let worker_state = Arc::clone(&self.state);
         let scanner_id_clone = self.scanner_id.clone();
         let handle = thread::Builder::new()
             .name(format!("sc-audio-{}", self.scanner_id))
             .spawn(move || {
-                let Some(thread_dev) = resolve_input_device(dev_name.as_deref(), dev_idx) else {
-                    worker_running.store(false, Ordering::SeqCst);
-                    return;
-                };
-                let stream_cfg = StreamConfig {
-                    channels: hw_channels,
-                    sample_rate: cpal::SampleRate(hw_rate),
-                    buffer_size: cpal::BufferSize::Default,
-                };
-                let stream_res = match sample_format {
-                    SampleFormat::F32 => thread_dev.build_input_stream(
-                        &stream_cfg,
-                        move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                            push_rt_input_callback(
-                                data,
-                                ch_usize,
-                                ch_mode,
-                                &mut producer,
-                                &level_cb,
-                                &xrun_cb,
-                            );
-                        },
-                        move |_err| {
-                            err_xrun.fetch_add(1, Ordering::Relaxed);
-                        },
-                        None,
-                    ),
-                    SampleFormat::I16 => {
-                        let mut f32_scratch = [0.0_f32; 4096];
-                        thread_dev.build_input_stream(
-                            &stream_cfg,
-                            move |data: &[i16], _: &cpal::InputCallbackInfo| {
-                                for chunk in data.chunks(f32_scratch.len()) {
-                                    for (dst, &src) in f32_scratch.iter_mut().zip(chunk.iter()) {
-                                        *dst = f32::from(src) / 32768.0;
-                                    }
-                                    push_rt_input_callback(
-                                        &f32_scratch[..chunk.len()],
-                                        ch_usize,
-                                        ch_mode,
-                                        &mut producer,
-                                        &level_cb,
-                                        &xrun_cb,
-                                    );
-                                }
-                            },
-                            move |_err| {
-                                err_xrun.fetch_add(1, Ordering::Relaxed);
-                            },
-                            None,
-                        )
-                    }
-                    _ => {
-                        worker_running.store(false, Ordering::SeqCst);
-                        return;
-                    }
-                };
-
-                let Ok(stream) = stream_res else {
-                    worker_running.store(false, Ordering::SeqCst);
-                    return;
-                };
-                if stream.play().is_err() {
-                    worker_running.store(false, Ordering::SeqCst);
-                    return;
-                }
-                let _stream_guard = stream;
-
                 let mut f32_batch = Vec::with_capacity(1024);
                 let mut i16_batch = Vec::with_capacity(1024);
                 let mut pcm_bytes = Vec::with_capacity(2048);
+                let mut backoff_secs = 2_u64;
 
                 while worker_running.load(Ordering::Relaxed) {
-                    let avail = consumer.slots();
-                    if avail == 0 {
-                        thread::sleep(Duration::from_millis(5));
+                    let Some(thread_dev) = resolve_input_device(dev_name.as_deref(), dev_idx)
+                    else {
+                        tracing::warn!(
+                            scanner_id = %scanner_id_clone,
+                            device_name = ?dev_name,
+                            device_index = ?dev_idx,
+                            backoff_secs,
+                            "No audio input device available; retrying"
+                        );
+                        sleep_interruptible(&worker_running, Duration::from_secs(backoff_secs));
+                        backoff_secs = (backoff_secs * 2).min(15);
+                        continue;
+                    };
+                    let actual_dev_name = resolved_device_name(&thread_dev);
+                    let default_cfg = match thread_dev.default_input_config() {
+                        Ok(cfg) => cfg,
+                        Err(err) => {
+                            tracing::warn!(
+                                scanner_id = %scanner_id_clone,
+                                device = %actual_dev_name,
+                                error = %err,
+                                backoff_secs,
+                                "Could not query default input config; retrying"
+                            );
+                            sleep_interruptible(&worker_running, Duration::from_secs(backoff_secs));
+                            backoff_secs = (backoff_secs * 2).min(15);
+                            continue;
+                        }
+                    };
+
+                    let hw_rate = default_cfg.sample_rate();
+                    let hw_channels = default_cfg.channels().clamp(1, 2);
+                    let sample_format = default_cfg.sample_format();
+                    active_sr.store(hw_rate, Ordering::Relaxed);
+
+                    if let Ok(mut guard) = worker_state.lock() {
+                        guard.pre_buffer =
+                            PreRollRingBuffer::new((f64::from(hw_rate) * 2.0) as usize);
+                    }
+
+                    let ring_capacity = (hw_rate as usize) * 2;
+                    let (mut producer, mut consumer) = rtrb::RingBuffer::<f32>::new(ring_capacity);
+                    let ch_usize = usize::from(hw_channels);
+                    let stream_err_count = Arc::new(AtomicU64::new(0));
+                    let stream_fatal = Arc::new(AtomicBool::new(false));
+                    let level_cb_inner = Arc::clone(&level_cb);
+                    let xrun_cb_inner = Arc::clone(&xrun_cb);
+
+                    let stream_cfg = StreamConfig {
+                        channels: hw_channels,
+                        sample_rate: hw_rate,
+                        buffer_size: cpal::BufferSize::Default,
+                    };
+                    let err_cb = make_stream_error_callback(
+                        Arc::clone(&xrun_cb),
+                        Arc::clone(&stream_err_count),
+                        Arc::clone(&stream_fatal),
+                    );
+
+                    let stream_res = match sample_format {
+                        SampleFormat::F32 => thread_dev.build_input_stream(
+                            stream_cfg,
+                            move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                                push_rt_input_callback(
+                                    data,
+                                    ch_usize,
+                                    ch_mode,
+                                    &mut producer,
+                                    &level_cb_inner,
+                                    &xrun_cb_inner,
+                                );
+                            },
+                            err_cb,
+                            None,
+                        ),
+                        SampleFormat::I16 => {
+                            let mut f32_scratch = [0.0_f32; 4096];
+                            thread_dev.build_input_stream(
+                                stream_cfg,
+                                move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                                    for chunk in data.chunks(f32_scratch.len()) {
+                                        for (dst, &src) in f32_scratch.iter_mut().zip(chunk.iter())
+                                        {
+                                            *dst = f32::from(src) / 32768.0;
+                                        }
+                                        push_rt_input_callback(
+                                            &f32_scratch[..chunk.len()],
+                                            ch_usize,
+                                            ch_mode,
+                                            &mut producer,
+                                            &level_cb_inner,
+                                            &xrun_cb_inner,
+                                        );
+                                    }
+                                },
+                                err_cb,
+                                None,
+                            )
+                        }
+                        other => {
+                            tracing::warn!(
+                                scanner_id = %scanner_id_clone,
+                                device = %actual_dev_name,
+                                ?other,
+                                backoff_secs,
+                                "Unsupported input sample format; retrying"
+                            );
+                            sleep_interruptible(&worker_running, Duration::from_secs(backoff_secs));
+                            backoff_secs = (backoff_secs * 2).min(15);
+                            continue;
+                        }
+                    };
+
+                    let stream = match stream_res {
+                        Ok(s) => s,
+                        Err(err) => {
+                            tracing::warn!(
+                                scanner_id = %scanner_id_clone,
+                                device = %actual_dev_name,
+                                error = %err,
+                                backoff_secs,
+                                "Could not build audio input stream; retrying"
+                            );
+                            sleep_interruptible(&worker_running, Duration::from_secs(backoff_secs));
+                            backoff_secs = (backoff_secs * 2).min(15);
+                            continue;
+                        }
+                    };
+
+                    if let Err(err) = stream.play() {
+                        tracing::warn!(
+                            scanner_id = %scanner_id_clone,
+                            device = %actual_dev_name,
+                            error = %err,
+                            backoff_secs,
+                            "Could not play audio input stream; retrying"
+                        );
+                        sleep_interruptible(&worker_running, Duration::from_secs(backoff_secs));
+                        backoff_secs = (backoff_secs * 2).min(15);
                         continue;
                     }
 
-                    f32_batch.clear();
-                    i16_batch.clear();
-                    pcm_bytes.clear();
+                    backoff_secs = 2;
+                    tracing::info!(
+                        scanner_id = %scanner_id_clone,
+                        device = %actual_dev_name,
+                        sample_rate = hw_rate,
+                        channels = hw_channels,
+                        channel_mode = ?ch_mode,
+                        "Audio capture stream started"
+                    );
+                    let _stream_guard = stream;
+                    let mut last_err_seen = 0_u64;
+                    let mut last_err_log = Instant::now();
 
-                    let to_pop = avail.min(2048);
-                    for _ in 0..to_pop {
-                        if let Ok(sample) = consumer.pop() {
-                            f32_batch.push(sample);
-                            let clamped = (sample.clamp(-1.0, 1.0) * 32767.0) as i16;
-                            i16_batch.push(clamped);
-                            pcm_bytes.extend_from_slice(&clamped.to_le_bytes());
+                    while worker_running.load(Ordering::Relaxed) {
+                        if last_err_log.elapsed() >= Duration::from_secs(2) {
+                            let cur_errs = stream_err_count.load(Ordering::Relaxed);
+                            if cur_errs > last_err_seen {
+                                tracing::warn!(
+                                    scanner_id = %scanner_id_clone,
+                                    device = %actual_dev_name,
+                                    new_errors = cur_errs - last_err_seen,
+                                    total_errors = cur_errs,
+                                    "Audio input stream backend errors observed"
+                                );
+                                last_err_seen = cur_errs;
+                            }
+                            last_err_log = Instant::now();
                         }
-                    }
 
-                    if let Some(mixer_arc) = &loopback_mixer {
-                        if let Ok(mut mixer) = mixer_arc.lock() {
-                            let processed =
-                                mixer.push_audio(&scanner_id_clone, &f32_batch, hw_rate);
-                            if let Some(rt_prod) = &mut rt_loopback_producer {
-                                for &s in &processed {
-                                    let _ = rt_prod.push(s);
+                        if stream_fatal.load(Ordering::Relaxed) {
+                            tracing::warn!(
+                                scanner_id = %scanner_id_clone,
+                                device = %actual_dev_name,
+                                "Audio input device disconnected or changed; rebuilding stream"
+                            );
+                            break;
+                        }
+
+                        let avail = consumer.slots();
+                        if avail == 0 {
+                            thread::sleep(Duration::from_millis(5));
+                            continue;
+                        }
+
+                        f32_batch.clear();
+                        i16_batch.clear();
+                        pcm_bytes.clear();
+
+                        let to_pop = avail.min(2048);
+                        for _ in 0..to_pop {
+                            if let Ok(sample) = consumer.pop() {
+                                f32_batch.push(sample);
+                                let clamped = (sample.clamp(-1.0, 1.0) * 32767.0) as i16;
+                                i16_batch.push(clamped);
+                                pcm_bytes.extend_from_slice(&clamped.to_le_bytes());
+                            }
+                        }
+
+                        if let Some(mixer_arc) = &loopback_mixer {
+                            if let Ok(mut mixer) = mixer_arc.lock() {
+                                let processed =
+                                    mixer.push_audio(&scanner_id_clone, &f32_batch, hw_rate);
+                                if let Some(rt_prod) = &mut rt_loopback_producer {
+                                    for &s in &processed {
+                                        let _ = rt_prod.push(s);
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Ok(mut guard) = worker_state.lock() {
+                            if guard.recording_enabled {
+                                guard.pre_buffer.write(&i16_batch);
+                                if let Some(session) = &mut guard.active_session {
+                                    session.append(&pcm_bytes);
                                 }
                             }
                         }
                     }
 
-                    if let Ok(mut guard) = worker_state.lock() {
-                        if guard.recording_enabled {
-                            guard.pre_buffer.write(&i16_batch);
-                            if let Some(session) = &mut guard.active_session {
-                                session.append(&pcm_bytes);
-                            }
-                        }
+                    level_cb.store(0, Ordering::Relaxed);
+                    if worker_running.load(Ordering::Relaxed) {
+                        sleep_interruptible(&worker_running, Duration::from_secs(backoff_secs));
+                        backoff_secs = (backoff_secs * 2).min(15);
                     }
                 }
             });
 
         if let Ok(h) = handle {
             self.worker_handle = Some(h);
-            tracing::info!(
-                scanner_id = %self.scanner_id,
-                sample_rate = hw_rate,
-                channel_mode = ?self.channel_mode,
-                "Audio capture stream started"
-            );
         } else {
             self.running.store(false, Ordering::SeqCst);
         }
@@ -678,12 +794,13 @@ impl SingleScannerAudioStream {
             return;
         }
 
+        let actual_rate = self.active_sample_rate.load(Ordering::Relaxed);
         tracing::info!(
             scanner_id = %self.scanner_id,
             duration = dur,
             bytes = pcm.len(),
-            sample_rate = self.sample_rate,
-            "Transmission complete; dispatching to ScanScribe"
+            sample_rate = actual_rate,
+            "Transmission complete; dispatching recording"
         );
 
         if let Some(cb) = &self.dispatch_callback {
@@ -692,7 +809,7 @@ impl SingleScannerAudioStream {
                 status: session.status,
                 pcm_bytes: pcm,
                 duration_seconds: dur,
-                sample_rate: self.sample_rate,
+                sample_rate: actual_rate,
             });
         }
     }
@@ -827,6 +944,7 @@ impl ScannerAudioRecorder {
     }
 
     /// Starts hardware loopback output and per-scanner capture streams.
+    #[allow(clippy::too_many_lines)]
     pub fn start(&mut self) {
         if self.running {
             return;
@@ -839,66 +957,148 @@ impl ScannerAudioRecorder {
         // Start loopback output stream if enabled and an output device is present
         let loopback_enabled = self.loopback_mixer.lock().is_ok_and(|m| m.enabled);
         if loopback_enabled {
-            if let Some(out_dev) =
-                resolve_output_device(self.output_device_name.as_deref(), self.output_device_index)
-            {
-                if let Ok(def_out) = out_dev.default_output_config() {
-                    let out_rate = def_out.sample_rate().0;
-                    let out_ch = def_out.channels().clamp(1, 2);
-                    if let Ok(mut mixer) = self.loopback_mixer.lock() {
-                        mixer.samplerate = out_rate;
-                    }
-                    let shared = Arc::clone(&self.rt_loopback_shared);
-                    let out_name = self.output_device_name.clone();
-                    let out_idx = self.output_device_index;
-                    let out_run = Arc::clone(&self.output_running);
-                    out_run.store(true, Ordering::SeqCst);
+            let shared = Arc::clone(&self.rt_loopback_shared);
+            let out_name = self.output_device_name.clone();
+            let out_idx = self.output_device_index;
+            let out_run = Arc::clone(&self.output_running);
+            let mixer_arc = Arc::clone(&self.loopback_mixer);
+            out_run.store(true, Ordering::SeqCst);
 
-                    if let Ok(h) = thread::Builder::new()
-                        .name("sc-audio-loopback".to_string())
-                        .spawn(move || {
-                            let Some(thread_out_dev) =
-                                resolve_output_device(out_name.as_deref(), out_idx)
-                            else {
-                                out_run.store(false, Ordering::SeqCst);
-                                return;
-                            };
-                            let cfg = StreamConfig {
-                                channels: out_ch,
-                                sample_rate: cpal::SampleRate(out_rate),
-                                buffer_size: cpal::BufferSize::Default,
-                            };
-                            let ch_usize = usize::from(out_ch);
-                            if let Ok(stream) = thread_out_dev.build_output_stream(
-                                &cfg,
-                                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                                    fill_rt_output_callback(
-                                        data,
-                                        ch_usize,
-                                        &mut cons_a,
-                                        &mut cons_b,
-                                        &shared,
+            if let Ok(h) = thread::Builder::new()
+                .name("sc-audio-loopback".to_string())
+                .spawn(move || {
+                    let mut backoff_secs = 2_u64;
+                    let mut out_cons_pair = Some((cons_a, cons_b));
+
+                    // Wait: rebuilds inside retry loop reuse cons_a / cons_b seamlessly via Option take+put back?
+                    // Even simpler: cpal closure owns `cons_a` / `cons_b`, so only retry resolving the device
+                    // BEFORE handing `cons_a` / `cons_b` to `build_output_stream` — or return early only if fatal?
+                    // Wait: if build_output_stream or play fails, `Err` drops the closure (which would drop cons_a/b)!
+                    // Instead, keep attempting resolve + default_output_config BEFORE consuming cons_a/cons_b!
+                    let mut bound_dev: Option<(cpal::Device, String, u32, u16)> = None;
+                    while out_run.load(Ordering::Relaxed) {
+                        if let Some(dev) = resolve_output_device(out_name.as_deref(), out_idx) {
+                            let actual_name = resolved_device_name(&dev);
+                            match dev.default_output_config() {
+                                Ok(def_out) => {
+                                    let out_rate = def_out.sample_rate();
+                                    let out_ch = def_out.channels().clamp(1, 2);
+                                    bound_dev = Some((dev, actual_name, out_rate, out_ch));
+                                    break;
+                                }
+                                Err(err) => {
+                                    tracing::warn!(
+                                        device = %actual_name,
+                                        error = %err,
+                                        backoff_secs,
+                                        "Could not query default output config; retrying"
                                     );
-                                },
-                                move |_err| {},
-                                None,
-                            ) {
-                                if stream.play().is_ok() {
-                                    let _stream_guard = stream;
-                                    while out_run.load(Ordering::Relaxed) {
-                                        thread::sleep(Duration::from_millis(10));
-                                    }
                                 }
                             }
-                            out_run.store(false, Ordering::SeqCst);
-                        })
-                    {
-                        self.output_handle = Some(h);
-                    } else {
-                        self.output_running.store(false, Ordering::SeqCst);
+                        } else {
+                            tracing::warn!(
+                                device_name = ?out_name,
+                                device_index = ?out_idx,
+                                backoff_secs,
+                                "No audio loopback output device available; retrying"
+                            );
+                        }
+                        sleep_interruptible(&out_run, Duration::from_secs(backoff_secs));
+                        backoff_secs = (backoff_secs * 2).min(15);
                     }
-                }
+
+                    let Some((thread_out_dev, actual_name, out_rate, out_ch)) = bound_dev else {
+                        out_run.store(false, Ordering::SeqCst);
+                        return;
+                    };
+
+                    if let Ok(mut mixer) = mixer_arc.lock() {
+                        mixer.samplerate = out_rate;
+                    }
+                    let cfg = StreamConfig {
+                        channels: out_ch,
+                        sample_rate: out_rate,
+                        buffer_size: cpal::BufferSize::Default,
+                    };
+                    let ch_usize = usize::from(out_ch);
+                    let err_xrun = Arc::new(AtomicU64::new(0));
+                    let stream_err_count = Arc::new(AtomicU64::new(0));
+                    let stream_fatal = Arc::new(AtomicBool::new(false));
+                    let err_cb = make_stream_error_callback(
+                        err_xrun,
+                        Arc::clone(&stream_err_count),
+                        Arc::clone(&stream_fatal),
+                    );
+                    if let Some((mut ca, mut cb)) = out_cons_pair.take() {
+                        match thread_out_dev.build_output_stream(
+                            cfg,
+                            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                                fill_rt_output_callback(data, ch_usize, &mut ca, &mut cb, &shared);
+                            },
+                            err_cb,
+                            None,
+                        ) {
+                            Ok(stream) => match stream.play() {
+                                Ok(()) => {
+                                    tracing::info!(
+                                        device = %actual_name,
+                                        sample_rate = out_rate,
+                                        channels = out_ch,
+                                        "Audio loopback output stream started"
+                                    );
+                                    let _stream_guard = stream;
+                                    let mut last_err_seen = 0_u64;
+                                    let mut last_err_log = Instant::now();
+                                    while out_run.load(Ordering::Relaxed) {
+                                        if last_err_log.elapsed() >= Duration::from_secs(2) {
+                                            let cur = stream_err_count.load(Ordering::Relaxed);
+                                            if cur > last_err_seen {
+                                                tracing::warn!(
+                                                    device = %actual_name,
+                                                    new_errors = cur - last_err_seen,
+                                                    total_errors = cur,
+                                                    "Audio loopback stream backend errors observed"
+                                                );
+                                                last_err_seen = cur;
+                                            }
+                                            last_err_log = Instant::now();
+                                        }
+                                        if stream_fatal.load(Ordering::Relaxed) {
+                                            tracing::warn!(
+                                                device = %actual_name,
+                                                "Audio loopback output device disconnected or changed"
+                                            );
+                                            break;
+                                        }
+                                        thread::sleep(Duration::from_millis(20));
+                                    }
+                                }
+                                Err(err) => {
+                                    tracing::warn!(
+                                        device = %actual_name,
+                                        error = %err,
+                                        "Could not play audio loopback output stream"
+                                    );
+                                }
+                            },
+                            Err(err) => {
+                                tracing::warn!(
+                                    device = %actual_name,
+                                    error = %err,
+                                    "Could not build audio loopback output stream"
+                                );
+                            }
+                        }
+                    }
+                    out_run.store(false, Ordering::SeqCst);
+                })
+            {
+                self.output_handle = Some(h);
+            } else {
+                self.output_running.store(false, Ordering::SeqCst);
             }
+        } else {
+            let _ = (&mut cons_a, &mut cons_b);
         }
 
         let mut opt_prod_a = Some(prod_a);
@@ -910,6 +1110,14 @@ impl ScannerAudioRecorder {
                 opt_prod_b.take()
             };
             stream.start(Some(Arc::clone(&self.loopback_mixer)), prod);
+        }
+    }
+
+    /// Restarts active capture and loopback streams cleanly if currently running.
+    pub fn restart_if_running(&mut self) {
+        if self.running {
+            self.stop();
+            self.start();
         }
     }
 

@@ -14,6 +14,7 @@ use crate::error::ConfigError;
 pub struct ScannerConfig {
     pub id: String,
     pub name: String,
+    #[serde(default = "default_scanner_model")]
     pub model: ScannerModel,
     #[serde(default)]
     pub connection_mode: ConnectionMode,
@@ -47,6 +48,10 @@ pub struct ScannerConfig {
 
 fn default_com_port() -> String {
     "COM5".to_string()
+}
+
+const fn default_scanner_model() -> ScannerModel {
+    ScannerModel::BCD436HP
 }
 
 const fn default_baud_rate() -> u32 {
@@ -94,7 +99,7 @@ pub struct ScanScribeFeederConfig {
     pub enable_feeder: bool,
     #[serde(default)]
     pub feeder_mode: FeederMode,
-    #[serde(default = "default_inbox_directory")]
+    #[serde(default = "default_inbox_directory", alias = "output_directory")]
     pub inbox_directory: String,
     #[serde(default = "default_filename_template")]
     pub filename_template: String,

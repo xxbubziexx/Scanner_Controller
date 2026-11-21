@@ -989,10 +989,12 @@ mod tests {
         std::fs::create_dir_all(&fallback_dir).unwrap();
 
         // 1. Unwritable/invalid primary inbox path -> falls back to fallback_dir
+        let blocker_file = fallback_dir.join("not_a_directory");
+        std::fs::write(&blocker_file, b"blocker").unwrap();
         let cfg_drop = ScanScribeFeederConfig {
             enable_feeder: true,
             feeder_mode: FeederMode::DirectoryDrop,
-            inbox_directory: "Z:\\nonexistent_invalid_drive_99999\\inbox".to_string(),
+            inbox_directory: blocker_file.join("inbox").to_string_lossy().into_owned(),
             audio_format: "WAV".to_string(),
             enable_sidecar_json: true,
             ..ScanScribeFeederConfig::default()

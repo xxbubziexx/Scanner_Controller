@@ -174,6 +174,44 @@ impl ScannerModel {
                 | Self::UBCD536PT
         )
     }
+
+    /// Parses a `ScannerModel` from a raw `MDL` / `SI` response token (case-insensitive).
+    #[must_use]
+    pub fn from_mdl_str(raw: &str) -> Option<Self> {
+        let token = raw
+            .trim()
+            .split([',', ' ', '\t', '\r', '\n'])
+            .next()?
+            .trim();
+        if token.is_empty() {
+            return None;
+        }
+        Self::ALL
+            .iter()
+            .copied()
+            .find(|m| m.as_str().eq_ignore_ascii_case(token))
+    }
+
+    /// Matches a `ScannerModel` from a USB serial port product/description string
+    /// (checks longest model names first so e.g. `USDS100` / `SDS100E` match before `SDS100`).
+    #[must_use]
+    pub fn from_usb_description(desc: &str) -> Option<Self> {
+        let upper = desc.to_ascii_uppercase();
+        if upper.trim().is_empty() {
+            return None;
+        }
+        let mut best: Option<(usize, Self)> = None;
+        for m in Self::ALL {
+            let name = m.as_str();
+            if upper.contains(name) {
+                let len = name.len();
+                if best.is_none_or(|(best_len, _)| len > best_len) {
+                    best = Some((len, m));
+                }
+            }
+        }
+        best.map(|(_, m)| m)
+    }
 }
 
 /// Mutual exclusion channel lockout method.
@@ -223,4 +261,44 @@ pub enum FeederMode {
     DirectoryDrop,
     HttpWebhook,
     LiveStream,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_mdl_str_and_usb_description() {
+        assert_eq!(
+            ScannerModel::from_mdl_str("BCD436HP"),
+            Some(ScannerModel::BCD436HP)
+        );
+        assert_eq!(
+            ScannerModel::from_mdl_str(" bcd996p2,V1.0\r"),
+            Some(ScannerModel::BCD996P2)
+        );
+        assert_eq!(
+            ScannerModel::from_mdl_str("SDS100"),
+            Some(ScannerModel::SDS100)
+        );
+        assert_eq!(ScannerModel::from_mdl_str("invalid"), None);
+        assert_eq!(ScannerModel::from_mdl_str(""), None);
+
+        assert_eq!(
+            ScannerModel::from_usb_description("BCD436HP Serial Port"),
+            Some(ScannerModel::BCD436HP)
+        );
+        assert_eq!(
+            ScannerModel::from_usb_description("Uniden USDS100 Serial Port"),
+            Some(ScannerModel::USDS100)
+        );
+        assert_eq!(
+            ScannerModel::from_usb_description("Uniden BCT15X"),
+            Some(ScannerModel::BCT15X)
+        );
+        assert_eq!(
+            ScannerModel::from_usb_description("USB Serial Device"),
+            None
+        );
+    }
 }

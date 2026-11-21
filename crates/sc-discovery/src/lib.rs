@@ -10,6 +10,7 @@ use std::net::UdpSocket;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use sc_core::ScannerModel;
 use serde::{Deserialize, Serialize};
 use serialport::{SerialPortInfo, SerialPortType};
 use tracing::{debug, warn};
@@ -55,18 +56,70 @@ pub struct AvailablePortInfo {
     pub hwid: String,
     pub is_uniden: bool,
     pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detected_model: Option<String>,
+}
+
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn check_linux_tty_sysfs(
+    base_name: &str,
+    port_type: &SerialPortType,
+    sysfs_root: &std::path::Path,
+) -> bool {
+    if matches!(
+        port_type,
+        SerialPortType::UsbPort(_) | SerialPortType::PciPort | SerialPortType::BluetoothPort
+    ) {
+        return false;
+    }
+    if !sysfs_root.exists() {
+        return false;
+    }
+    let tty_dir = sysfs_root.join(base_name);
+    if !tty_dir.exists() {
+        return false;
+    }
+    if let Ok(tty_type) = std::fs::read_to_string(tty_dir.join("type")) {
+        if tty_type.trim() == "0" {
+            return true;
+        }
+    }
+    !tty_dir.join("device").exists() && matches!(port_type, SerialPortType::Unknown)
+}
+
+fn is_phantom_linux_serial_port(p: &SerialPortInfo) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        let base_name = std::path::Path::new(&p.port_name)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or(&p.port_name);
+        check_linux_tty_sysfs(
+            base_name,
+            &p.port_type,
+            std::path::Path::new("/sys/class/tty"),
+        )
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = p;
+        false
+    }
 }
 
 /// Lists all serial ports currently enumerated by the OS without opening any port (`server.py:156-188`).
 #[must_use]
 pub fn list_available_ports() -> Vec<AvailablePortInfo> {
-    let Ok(mut raw_ports) = serialport::available_ports() else {
+    let Ok(raw_ports) = serialport::available_ports() else {
         return Vec::new();
     };
-    raw_ports.sort_by_key(|p| extract_port_digits(&p.port_name));
 
-    let mut out = Vec::with_capacity(raw_ports.len());
+    let mut keyed: Vec<(bool, bool, u32, AvailablePortInfo)> = Vec::new();
     for p in raw_ports {
+        if is_phantom_linux_serial_port(&p) {
+            continue;
+        }
+        let is_usb = matches!(p.port_type, SerialPortType::UsbPort(_));
         let (description, hwid, is_uniden) = match &p.port_type {
             SerialPortType::UsbPort(info) => {
                 let prod = info.product.clone().unwrap_or_else(|| p.port_name.clone());
@@ -79,19 +132,29 @@ pub fn list_available_ports() -> Vec<AvailablePortInfo> {
             }
             _ => (p.port_name.clone(), String::new(), false),
         };
+        let detected_model =
+            ScannerModel::from_usb_description(&description).map(|m| m.as_str().to_string());
         let mut label = format!("{} - {}", p.port_name, description);
         if is_uniden {
             label.push_str(" (Uniden Radio Detected)");
         }
-        out.push(AvailablePortInfo {
-            device: p.port_name,
-            description,
-            hwid,
-            is_uniden,
-            label,
-        });
+        let digits = extract_port_digits(&p.port_name);
+        keyed.push((
+            !is_uniden,
+            !is_usb,
+            digits,
+            AvailablePortInfo {
+                device: p.port_name,
+                description,
+                hwid,
+                is_uniden,
+                label,
+                detected_model,
+            },
+        ));
     }
-    out
+    keyed.sort_by_key(|a| (a.0, a.1, a.2));
+    keyed.into_iter().map(|(_, _, _, info)| info).collect()
 }
 
 /// Parses a Uniden `MDL` command response (e.g. `"\rMDL,BCD436HP\r"` -> `Some("BCD436HP")`).
@@ -196,13 +259,22 @@ fn extract_usb_vid_pid(port_type: &SerialPortType) -> (Option<u16>, Option<u16>)
 #[must_use]
 #[allow(clippy::too_many_lines, clippy::similar_names)]
 pub fn detect_serial_ports(active_ports: &[String]) -> Vec<DetectedPort> {
-    let Ok(mut raw_ports) = serialport::available_ports() else {
+    let Ok(raw_ports) = serialport::available_ports() else {
         warn!("Failed to enumerate system serial ports");
         return Vec::new();
     };
 
-    // Sort ports numerically by port digits (COM1, COM2, COM9, COM10)
+    // Sort ports numerically by port digits (COM1, COM2, COM9, COM10), excluding phantom Linux ttyS slots
+    let mut raw_ports: Vec<SerialPortInfo> = raw_ports
+        .into_iter()
+        .filter(|p| !is_phantom_linux_serial_port(p))
+        .collect();
     raw_ports.sort_by_key(|p| extract_port_digits(&p.port_name));
+
+    let active_canonical: Vec<std::path::PathBuf> = active_ports
+        .iter()
+        .filter_map(|ap| std::fs::canonicalize(ap.trim()).ok())
+        .collect();
 
     // Deduplicate ports by normalized digits/name (Common_PS_RF.cs:511)
     let mut seen_keys = HashSet::new();
@@ -227,11 +299,14 @@ pub fn detect_serial_ports(active_ports: &[String]) -> Vec<DetectedPort> {
         let digits_str = digits_num.to_string();
         let (usb_vid, usb_pid) = extract_usb_vid_pid(&port_info.port_type);
 
-        // Prime Directive 4: never open a port currently held by this instance
+        // Prime Directive 4: never open a port currently held by this instance (including via symlink)
+        let port_canon = std::fs::canonicalize(&port_name).ok();
         let is_active = active_ports.iter().any(|ap| {
             let ap_trim = ap.trim();
             ap_trim.eq_ignore_ascii_case(&port_name) || ap_trim == digits_str
-        });
+        }) || port_canon
+            .as_ref()
+            .is_some_and(|pc| active_canonical.contains(pc));
 
         if is_active {
             results.push(DetectedPort {
@@ -283,7 +358,8 @@ pub fn detect_serial_ports(active_ports: &[String]) -> Vec<DetectedPort> {
                     drop(ser);
 
                     if let Some(m) = model_opt {
-                        found_model = m;
+                        found_model =
+                            ScannerModel::from_mdl_str(&m).map_or(m, |sm| sm.as_str().to_string());
                         found_baud = baud;
                         break;
                     }
@@ -433,5 +509,53 @@ mod tests {
         assert_eq!(parsed.ip_address, "192.168.1.50");
         assert_eq!(parsed.model, "BCD536HP");
         assert_eq!(parsed.name, "Main Tower Scanner");
+    }
+
+    #[test]
+    fn test_phantom_linux_tty_filtering() {
+        let temp_sysfs = std::env::temp_dir().join(format!(
+            "sc_tty_sysfs_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let tty_s0 = temp_sysfs.join("ttyS0");
+        let tty_s1_real = temp_sysfs.join("ttyS1");
+        let tty_acm1 = temp_sysfs.join("ttyACM1");
+        std::fs::create_dir_all(&tty_s0).unwrap();
+        std::fs::create_dir_all(tty_s1_real.join("device")).unwrap();
+        std::fs::create_dir_all(&tty_acm1).unwrap();
+        std::fs::write(tty_s0.join("type"), "0\n").unwrap();
+        std::fs::write(tty_s1_real.join("type"), "4\n").unwrap();
+
+        // Unknown port with type=0 -> phantom
+        assert!(check_linux_tty_sysfs(
+            "ttyS0",
+            &SerialPortType::Unknown,
+            &temp_sysfs
+        ));
+        // Unknown port with type=4 and device/ -> real UART
+        assert!(!check_linux_tty_sysfs(
+            "ttyS1",
+            &SerialPortType::Unknown,
+            &temp_sysfs
+        ));
+        // USB port -> never filtered even if sysfs has no type
+        let usb = SerialPortType::UsbPort(serialport::UsbPortInfo {
+            vid: 0x1965,
+            pid: 0x001a,
+            serial_number: None,
+            manufacturer: Some("UNIDEN AMERICA CORP.".to_string()),
+            product: Some("BCD436HP Serial Port".to_string()),
+        });
+        assert!(!check_linux_tty_sysfs("ttyACM1", &usb, &temp_sysfs));
+        assert_eq!(
+            ScannerModel::from_usb_description("BCD436HP Serial Port")
+                .map(|m| m.as_str().to_string()),
+            Some("BCD436HP".to_string())
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_sysfs);
     }
 }

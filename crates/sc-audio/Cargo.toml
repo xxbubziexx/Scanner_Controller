@@ -20,6 +20,11 @@ tracing.workspace = true
 rtrb.workspace = true
 rubato.workspace = true
 hound.workspace = true
-cpal.workspace = true
 mp3lame-encoder.workspace = true
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+cpal = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+cpal = { workspace = true, features = ["pulseaudio"] }
 

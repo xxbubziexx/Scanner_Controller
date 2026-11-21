@@ -14,7 +14,7 @@
       <div class="logo-icon">U</div>
       <div class="logo-text">
         <h1>Uniden Dynamic Scanner Sync</h1>
-        <p>Mutual Exclusion Controller • ProScan Compatible Auto-Detect &amp; Recording Engine</p>
+        <p>Mutual Exclusion Controller • ProScan Auto-Detect &amp; Recording Engine</p>
       </div>
     </div>
 
@@ -43,13 +43,12 @@
 
   <div class="container">
 
-    <!-- Scanner A (BCD436HP) -->
+    <!-- Scanner A -->
     <div class="scanner-card card-a" id="cardA">
       <div class="scanner-header">
         <div class="scanner-title">
           <h2 id="nameA">Scanner A</h2>
-          <select class="badge-model-select" id="cardModelSelectA" title="Click to change Scanner A model" onchange="changeModelFromCard('scanner_a', this.value)">
-          </select>
+          <span class="badge-model" id="cardModelBadgeA" title="Auto-detected from COM port">AUTO-DETECT</span>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <span class="rec-badge rec-on" id="recBadgeA">REC ON</span>
@@ -60,58 +59,63 @@
         </div>
       </div>
 
-      <div class="lcd-display">
-        <div class="lcd-sys" id="sysA">METRO P25 TRUNKING</div>
-        <div class="lcd-dept" id="deptA">POLICE DISPATCH NORTH</div>
-        <div class="lcd-channel" id="chanA">SCANNING...</div>
-        <div class="lcd-meta-row">
-          <div class="meta-item"><span>TGID:</span> <strong id="tgidA">--</strong></div>
-          <div class="meta-item"><span>FREQ:</span> <strong id="freqA">-- MHz</strong></div>
-          <div class="meta-item"><span>MOD:</span> <strong id="modA">NFM</strong></div>
-          <div class="meta-item"><span>UID:</span> <strong id="uidA">--</strong></div>
-          <div class="rssi-container" id="rssiA">
-            <div class="rssi-bar b1"></div>
-            <div class="rssi-bar b2"></div>
-            <div class="rssi-bar b3"></div>
-            <div class="rssi-bar b4"></div>
-            <div class="rssi-bar b5"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Live Audio VU Meter (Scanner A) -->
-      <div class="vu-meter-row">
-        <span class="vu-label">🎙️ AUDIO VU</span>
-        <div class="vu-bar-track">
-          <div class="vu-bar-fill" id="vuBarA"></div>
-        </div>
-        <span class="vu-pct" id="vuPctA">0%</span>
-      </div>
-
-      <!-- Quick Per-Card Enable & Audio Toggles -->
+      <!-- Persistent Card Power & Audio Toggles -->
       <div class="card-quick-toggles">
         <label class="mini-toggle">
           <input type="checkbox" id="cardEnableA" checked onchange="toggleCardScannerEnabled('scanner_a', this.checked)">
           <span>Enable Scanner A</span>
         </label>
-        <label class="mini-toggle">
+        <label class="mini-toggle" id="cardAudioWrapA">
           <input type="checkbox" id="cardAudioEnableA" checked onchange="toggleCardAudioEnabled('scanner_a', this.checked)">
           <span>Enable Audio Capture</span>
         </label>
       </div>
 
-      <div class="scanner-actions">
-        <button class="btn btn-danger" style="width: 100%;" onclick="sendSkip('scanner_a')">⏭️ SKIP / AVOID (KEY,AVD)</button>
+      <div class="disabled-card-notice" id="cardDisabledNoticeA" style="display: none;">
+        Scanner A is disabled — toggle <strong>Enable Scanner A</strong> above to activate.
+      </div>
+
+      <div id="cardActiveBodyA">
+        <div class="lcd-display">
+          <div class="lcd-sys" id="sysA">Scanning...</div>
+          <div class="lcd-dept" id="deptA"></div>
+          <div class="lcd-channel" id="chanA">Scanning...</div>
+          <div class="lcd-meta-row">
+            <div class="meta-item"><span>TGID:</span> <strong id="tgidA">--</strong></div>
+            <div class="meta-item"><span>FREQ:</span> <strong id="freqA">-- MHz</strong></div>
+            <div class="meta-item"><span>MOD:</span> <strong id="modA">NFM</strong></div>
+            <div class="meta-item"><span>UID:</span> <strong id="uidA">--</strong></div>
+            <div class="rssi-container" id="rssiA">
+              <div class="rssi-bar b1"></div>
+              <div class="rssi-bar b2"></div>
+              <div class="rssi-bar b3"></div>
+              <div class="rssi-bar b4"></div>
+              <div class="rssi-bar b5"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Audio VU Meter (Scanner A) -->
+        <div class="vu-meter-row">
+          <span class="vu-label">🎙️ AUDIO VU</span>
+          <div class="vu-bar-track">
+            <div class="vu-bar-fill" id="vuBarA"></div>
+          </div>
+          <span class="vu-pct" id="vuPctA">0%</span>
+        </div>
+
+        <div class="scanner-actions">
+          <button id="skipBtnA" class="btn btn-danger" style="width: 100%;" onclick="sendSkip('scanner_a')">⏭️ SKIP / AVOID</button>
+        </div>
       </div>
     </div>
 
-    <!-- Scanner B (BCD996P2) -->
+    <!-- Scanner B -->
     <div class="scanner-card card-b" id="cardB">
       <div class="scanner-header">
         <div class="scanner-title">
           <h2 id="nameB">Scanner B</h2>
-          <select class="badge-model-select" id="cardModelSelectB" title="Click to change Scanner B model" onchange="changeModelFromCard('scanner_b', this.value)">
-          </select>
+          <span class="badge-model" id="cardModelBadgeB" title="Auto-detected from COM port">AUTO-DETECT</span>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <span class="rec-badge rec-on" id="recBadgeB">REC ON</span>
@@ -122,53 +126,59 @@
         </div>
       </div>
 
-      <div class="lcd-display">
-        <div class="lcd-sys" id="sysB">COUNTY SIMULCAST</div>
-        <div class="lcd-dept" id="deptB">SHERIFF PRIMARY</div>
-        <div class="lcd-channel" id="chanB">SCANNING...</div>
-        <div class="lcd-meta-row">
-          <div class="meta-item"><span>TGID:</span> <strong id="tgidB">--</strong></div>
-          <div class="meta-item"><span>FREQ:</span> <strong id="freqB">-- MHz</strong></div>
-          <div class="meta-item"><span>MOD:</span> <strong id="modB">P25</strong></div>
-          <div class="meta-item"><span>UID:</span> <strong id="uidB">--</strong></div>
-          <div class="rssi-container" id="rssiB">
-            <div class="rssi-bar b1"></div>
-            <div class="rssi-bar b2"></div>
-            <div class="rssi-bar b3"></div>
-            <div class="rssi-bar b4"></div>
-            <div class="rssi-bar b5"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Live Audio VU Meter (Scanner B) -->
-      <div class="vu-meter-row">
-        <span class="vu-label">🎙️ AUDIO VU</span>
-        <div class="vu-bar-track">
-          <div class="vu-bar-fill" id="vuBarB"></div>
-        </div>
-        <span class="vu-pct" id="vuPctB">0%</span>
-      </div>
-
-      <!-- Quick Per-Card Enable & Audio Toggles -->
+      <!-- Persistent Card Power & Audio Toggles -->
       <div class="card-quick-toggles">
         <label class="mini-toggle">
           <input type="checkbox" id="cardEnableB" checked onchange="toggleCardScannerEnabled('scanner_b', this.checked)">
           <span>Enable Scanner B</span>
         </label>
-        <label class="mini-toggle">
+        <label class="mini-toggle" id="cardAudioWrapB">
           <input type="checkbox" id="cardAudioEnableB" checked onchange="toggleCardAudioEnabled('scanner_b', this.checked)">
           <span>Enable Audio Capture</span>
         </label>
       </div>
 
-      <div class="scanner-actions">
-        <button class="btn btn-danger" style="width: 100%;" onclick="sendSkip('scanner_b')">⏭️ SKIP / LOCKOUT (KEY,L/O)</button>
+      <div class="disabled-card-notice" id="cardDisabledNoticeB" style="display: none;">
+        Scanner B is disabled — toggle <strong>Enable Scanner B</strong> above to activate.
+      </div>
+
+      <div id="cardActiveBodyB">
+        <div class="lcd-display">
+          <div class="lcd-sys" id="sysB">Scanning...</div>
+          <div class="lcd-dept" id="deptB"></div>
+          <div class="lcd-channel" id="chanB">Scanning...</div>
+          <div class="lcd-meta-row">
+            <div class="meta-item"><span>TGID:</span> <strong id="tgidB">--</strong></div>
+            <div class="meta-item"><span>FREQ:</span> <strong id="freqB">-- MHz</strong></div>
+            <div class="meta-item"><span>MOD:</span> <strong id="modB">NFM</strong></div>
+            <div class="meta-item"><span>UID:</span> <strong id="uidB">--</strong></div>
+            <div class="rssi-container" id="rssiB">
+              <div class="rssi-bar b1"></div>
+              <div class="rssi-bar b2"></div>
+              <div class="rssi-bar b3"></div>
+              <div class="rssi-bar b4"></div>
+              <div class="rssi-bar b5"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Audio VU Meter (Scanner B) -->
+        <div class="vu-meter-row">
+          <span class="vu-label">🎙️ AUDIO VU</span>
+          <div class="vu-bar-track">
+            <div class="vu-bar-fill" id="vuBarB"></div>
+          </div>
+          <span class="vu-pct" id="vuPctB">0%</span>
+        </div>
+
+        <div class="scanner-actions">
+          <button id="skipBtnB" class="btn btn-danger" style="width: 100%;" onclick="sendSkip('scanner_b')">⏭️ SKIP / LOCKOUT</button>
+        </div>
       </div>
     </div>
 
     <!-- Mutual Exclusion Configuration Hub -->
-    <div class="panel full-width">
+    <div class="panel full-width" id="exclusionEnginePanel">
       <div class="panel-header">
         <h2>⚡ Mutual Exclusion Engine Controls</h2>
         <span style="font-size: 13px; color: var(--emerald-recv); font-weight: 600;" id="engineModeStatus">● Engine Active (Hardware Serial Mode)</span>
@@ -218,7 +228,7 @@
       </div>
     </div>
 
-    <!-- Live Audio Loopback Monitor Panel (Phase 6 Parity with gui.py) -->
+    <!-- Live Audio Loopback Monitor Panel -->
     <div class="panel full-width">
       <div class="panel-header">
         <h2>🔊 Live Audio Loopback Monitor</h2>
@@ -294,7 +304,7 @@
 
   <!-- Auto-Detect Modal -->
   <div class="modal-overlay" id="autoDetectModal">
-    <div class="modal-card" style="width: 800px; max-width: 95vw;">
+    <div class="modal-card auto-detect-modal-card">
       <div class="modal-header">
         <h2>🔍 ProScan Serial Port &amp; Scanner Auto-Detect</h2>
         <button class="close-btn" onclick="closeAutoDetectModal()">&times;</button>
@@ -334,207 +344,227 @@
     </div>
   </div>
 
-  <!-- Settings Modal -->
+  <!-- Settings Modal (Compact Tabbed Layout) -->
   <div class="modal-overlay" id="settingsModal">
     <div class="modal-card">
       <div class="modal-header">
-        <h2>⚙️ System, Driver &amp; ProScan Metadata Configuration</h2>
+        <h2>⚙️ Configuration &amp; Recording Settings</h2>
         <button class="close-btn" onclick="closeSettingsModal()">&times;</button>
       </div>
 
-      <form id="configForm" onsubmit="saveConfiguration(event)">
-        <h3 style="font-size: 14px; margin-bottom: 12px; color: var(--cyan-accent);">Scanner A Settings</h3>
-        <div class="rule-grid">
-          <div class="form-group">
-            <label>Radio Model (34 Catalog)</label>
-            <select id="cfg_model_a" class="form-select" onchange="updateBaudOptions('a')"></select>
-          </div>
-          <div class="form-group">
-            <label>Connection Mode</label>
-            <select id="cfg_mode_a" class="form-select" onchange="toggleConnectionModeUI('a')">
-              <option value="SERIAL">Serial COM Port</option>
-              <option value="IP">IP Sockets / ser2net</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <label id="lbl_port_a">Available COM Port</label>
-              <button type="button" onclick="refreshComPorts()" style="background: none; border: none; color: var(--cyan-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Ports</button>
+      <form id="configForm" class="modal-form" onsubmit="saveConfiguration(event)">
+        <!-- Settings Tabs -->
+        <div class="settings-tabs" role="tablist">
+          <button type="button" class="settings-tab-btn active" data-tab="scannerA" onclick="switchSettingsTab('scannerA')">
+            <span>Scanner A</span>
+            <span class="tab-pill" id="tabPillA">ON</span>
+          </button>
+          <button type="button" class="settings-tab-btn" data-tab="scannerB" onclick="switchSettingsTab('scannerB')">
+            <span>Scanner B</span>
+            <span class="tab-pill" id="tabPillB">ON</span>
+          </button>
+          <button type="button" class="settings-tab-btn" data-tab="recording" onclick="switchSettingsTab('recording')">
+            <span>📁 Recording &amp; Output</span>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Tab 1: Scanner A -->
+          <div class="settings-tab-pane active" id="tabPane_scannerA">
+            <div class="tab-section-banner">
+              <label class="mini-toggle" style="color: var(--text-main); font-size: 13px;">
+                <input type="checkbox" id="cfg_enabled_a" checked onchange="syncSettingsEnablePill('a')">
+                <span>Enable Scanner A</span>
+              </label>
+              <div>
+                <span style="color: var(--text-muted); font-size: 12px;">Detected Radio Model:</span>
+                <span class="detected-model-chip" id="cfg_detected_model_a">Auto-detected via COM port</span>
+              </div>
             </div>
-            <select id="cfg_port_a" class="form-select"></select>
-            <input type="text" id="cfg_custom_port_a" class="form-input" style="display: none; margin-top: 6px;" placeholder="e.g. 192.168.1.50 or COM5">
-          </div>
-          <div class="form-group">
-            <label>Baud Rate</label>
-            <select id="cfg_baud_a" class="form-select"></select>
-          </div>
-          <div class="form-group">
-            <label>Lockout / Skip Method</label>
-            <select id="cfg_lockout_a" class="form-select">
-              <option value="KEYPRESS">KEYPRESS (Immediate Skip / Avoid)</option>
-              <option value="MEMORY">MEMORY (Temporary Channel Lockout)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <label>Audio Input Device</label>
-              <button type="button" onclick="loadAudioDevices()" style="background: none; border: none; color: var(--cyan-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Audio</button>
+
+            <div class="rule-grid">
+              <div class="form-group">
+                <label>Connection Mode</label>
+                <select id="cfg_mode_a" class="form-select" onchange="toggleConnectionModeUI('a')">
+                  <option value="SERIAL">Serial COM Port</option>
+                  <option value="IP">IP Sockets / ser2net</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <label id="lbl_port_a">Available COM Port</label>
+                  <button type="button" onclick="refreshComPorts()" style="background: none; border: none; color: var(--cyan-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Ports</button>
+                </div>
+                <select id="cfg_port_a" class="form-select"></select>
+                <input type="text" id="cfg_custom_port_a" class="form-input" style="display: none; margin-top: 6px;" placeholder="e.g. 192.168.1.50 or COM5">
+              </div>
+              <div class="form-group">
+                <label>Baud Rate</label>
+                <select id="cfg_baud_a" class="form-select"></select>
+              </div>
+              <div class="form-group">
+                <label>Lockout / Skip Method</label>
+                <select id="cfg_lockout_a" class="form-select">
+                  <option value="KEYPRESS">KEYPRESS (Immediate Skip / Avoid)</option>
+                  <option value="MEMORY">MEMORY (Temporary Channel Lockout)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <label>Audio Input Device</label>
+                  <button type="button" onclick="loadAudioDevices(true)" style="background: none; border: none; color: var(--cyan-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Audio</button>
+                </div>
+                <select id="cfg_audio_dev_a" class="form-select"></select>
+              </div>
+              <div class="form-group">
+                <label>Audio Channel</label>
+                <select id="cfg_audio_ch_a" class="form-select">
+                  <option value="MONO">Mono / All Channels</option>
+                  <option value="LEFT">Left Channel (Stereo Splitter)</option>
+                  <option value="RIGHT">Right Channel (Stereo Splitter)</option>
+                </select>
+              </div>
+              <div class="form-group full-width">
+                <label>Filename Template Pattern</label>
+                <input type="text" id="cfg_filename_template_a" class="form-input" placeholder="%DT - %S - %C (%TG)" oninput="updateTemplatePreviews()">
+                <div class="preset-row">
+                  <button type="button" class="preset-chip" onclick="applyTemplatePreset('a', '%DT - %S - %C (%TG)', '%C (%TG)')">ProScan Default</button>
+                  <button type="button" class="preset-chip" onclick="applyTemplatePreset('a', '%C_%TG_%F', '%C')">Simple</button>
+                  <button type="button" class="preset-chip" onclick="applyTemplatePreset('a', '%Y-%M-%D_%H%N%S_%S_%G_%C_%TG', '%S - %G - %C (%TG)')">Detailed</button>
+                  <button type="button" class="preset-chip" onclick="applyTemplatePreset('a', '%G - %C (%TF)', '%G: %C')">Dept/Chan</button>
+                </div>
+                <div class="template-preview" id="preview_fn_a">Preview: --</div>
+              </div>
+              <div class="form-group full-width">
+                <label>TIT2 (Title) Tag Pattern</label>
+                <input type="text" id="cfg_tit2_template_a" class="form-input" placeholder="%C (%TG)" oninput="updateTemplatePreviews()">
+                <div class="template-preview" id="preview_tit2_a">TIT2: --</div>
+              </div>
             </div>
-            <select id="cfg_audio_dev_a" class="form-select"></select>
           </div>
-          <div class="form-group">
-            <label>Audio Channel</label>
-            <select id="cfg_audio_ch_a" class="form-select">
-              <option value="MONO">Mono / All Channels</option>
-              <option value="LEFT">Left Channel (Stereo Splitter)</option>
-              <option value="RIGHT">Right Channel (Stereo Splitter)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Filename Template Pattern</label>
-            <input type="text" id="cfg_filename_template_a" class="form-input" placeholder="%DT - %S - %C (%TG)" oninput="updateTemplatePreviews()">
-            <div class="preset-row">
-              <button type="button" class="preset-chip" onclick="applyTemplatePreset('a', '%DT - %S - %C (%TG)', '%C (%TG)')">ProScan Default</button>
-              <button type="button" class="preset-chip" onclick="applyTemplatePreset('a', '%C_%TG_%F', '%C')">Simple</button>
-              <button type="button" class="preset-chip" onclick="applyTemplatePreset('a', '%Y-%M-%D_%H%N%S_%S_%G_%C_%TG', '%S - %G - %C (%TG)')">Detailed</button>
-              <button type="button" class="preset-chip" onclick="applyTemplatePreset('a', '%G - %C (%TF)', '%G: %C')">Dept/Chan</button>
+
+          <!-- Tab 2: Scanner B -->
+          <div class="settings-tab-pane" id="tabPane_scannerB">
+            <div class="tab-section-banner">
+              <label class="mini-toggle" style="color: var(--text-main); font-size: 13px;">
+                <input type="checkbox" id="cfg_enabled_b" checked onchange="syncSettingsEnablePill('b')">
+                <span>Enable Scanner B</span>
+              </label>
+              <div>
+                <span style="color: var(--text-muted); font-size: 12px;">Detected Radio Model:</span>
+                <span class="detected-model-chip" id="cfg_detected_model_b" style="color: var(--violet-accent);">Auto-detected via COM port</span>
+              </div>
             </div>
-            <div class="template-preview" id="preview_fn_a">Preview: --</div>
+
+            <div class="rule-grid">
+              <div class="form-group">
+                <label>Connection Mode</label>
+                <select id="cfg_mode_b" class="form-select" onchange="toggleConnectionModeUI('b')">
+                  <option value="SERIAL">Serial COM Port</option>
+                  <option value="IP">IP Sockets / ser2net</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <label id="lbl_port_b">Available COM Port</label>
+                  <button type="button" onclick="refreshComPorts()" style="background: none; border: none; color: var(--violet-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Ports</button>
+                </div>
+                <select id="cfg_port_b" class="form-select"></select>
+                <input type="text" id="cfg_custom_port_b" class="form-input" style="display: none; margin-top: 6px;" placeholder="e.g. 192.168.1.50 or COM5">
+              </div>
+              <div class="form-group">
+                <label>Baud Rate</label>
+                <select id="cfg_baud_b" class="form-select"></select>
+              </div>
+              <div class="form-group">
+                <label>Lockout / Skip Method</label>
+                <select id="cfg_lockout_b" class="form-select">
+                  <option value="KEYPRESS">KEYPRESS (Immediate Skip / Avoid)</option>
+                  <option value="MEMORY">MEMORY (Temporary Channel Lockout)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <label>Audio Input Device</label>
+                  <button type="button" onclick="loadAudioDevices(true)" style="background: none; border: none; color: var(--violet-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Audio</button>
+                </div>
+                <select id="cfg_audio_dev_b" class="form-select"></select>
+              </div>
+              <div class="form-group">
+                <label>Audio Channel</label>
+                <select id="cfg_audio_ch_b" class="form-select">
+                  <option value="MONO">Mono / All Channels</option>
+                  <option value="LEFT">Left Channel (Stereo Splitter)</option>
+                  <option value="RIGHT">Right Channel (Stereo Splitter)</option>
+                </select>
+              </div>
+              <div class="form-group full-width">
+                <label>Filename Template Pattern</label>
+                <input type="text" id="cfg_filename_template_b" class="form-input" placeholder="%DT - %S - %C (%TG)" oninput="updateTemplatePreviews()">
+                <div class="preset-row">
+                  <button type="button" class="preset-chip" onclick="applyTemplatePreset('b', '%DT - %S - %C (%TG)', '%C (%TG)')">ProScan Default</button>
+                  <button type="button" class="preset-chip" onclick="applyTemplatePreset('b', '%C_%TG_%F', '%C')">Simple</button>
+                  <button type="button" class="preset-chip" onclick="applyTemplatePreset('b', '%Y-%M-%D_%H%N%S_%S_%G_%C_%TG', '%S - %G - %C (%TG)')">Detailed</button>
+                  <button type="button" class="preset-chip" onclick="applyTemplatePreset('b', '%G - %C (%TF)', '%G: %C')">Dept/Chan</button>
+                </div>
+                <div class="template-preview" id="preview_fn_b">Preview: --</div>
+              </div>
+              <div class="form-group full-width">
+                <label>TIT2 (Title) Tag Pattern</label>
+                <input type="text" id="cfg_tit2_template_b" class="form-input" placeholder="%C (%TG)" oninput="updateTemplatePreviews()">
+                <div class="template-preview" id="preview_tit2_b">TIT2: --</div>
+              </div>
+            </div>
           </div>
-          <div class="form-group">
-            <label>TIT2 (Title) Tag Pattern</label>
-            <input type="text" id="cfg_tit2_template_a" class="form-input" placeholder="%C (%TG)" oninput="updateTemplatePreviews()">
-            <div class="template-preview" id="preview_tit2_a">TIT2: --</div>
+
+          <!-- Tab 3: Recording & Output -->
+          <div class="settings-tab-pane" id="tabPane_recording">
+            <h3 style="font-size: 14px; margin-bottom: 12px; color: var(--emerald-recv);">📁 Audio Output &amp; Format Settings</h3>
+            <div class="rule-grid">
+              <div class="form-group full-width">
+                <label for="cfg_output_dir">Audio Output Directory</label>
+                <input type="text" id="cfg_output_dir" class="form-input" placeholder="/var/recordings or C:\Recordings">
+              </div>
+              <div class="form-group">
+                <label for="cfg_feeder_format">Audio File Format</label>
+                <select id="cfg_feeder_format" class="form-select" onchange="updateTemplatePreviews()">
+                  <option value="WAV" selected>WAV Audio (RIFF LIST + pros Chunk)</option>
+                  <option value="MP3">MP3 Audio (ID3v2.3 + pros Chunk)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="cfg_feeder_sample_rate">Sample Rate (Hz)</label>
+                <select id="cfg_feeder_sample_rate" class="form-select">
+                  <option value="8000">8000 Hz</option>
+                  <option value="11025">11025 Hz</option>
+                  <option value="16000" selected>16000 Hz</option>
+                  <option value="22050">22050 Hz</option>
+                  <option value="44100">44100 Hz</option>
+                </select>
+              </div>
+              <div class="form-group full-width" style="gap: 10px;">
+                <label class="mini-toggle">
+                  <input type="checkbox" id="cfg_feeder_proscan_tags" checked>
+                  <span>Embed Binary ProScan Tags (pros + ID3/RIFF)</span>
+                </label>
+                <label class="mini-toggle">
+                  <input type="checkbox" id="cfg_feeder_sidecar_json" checked>
+                  <span>Write Companion .json Sidecar Metadata</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- ProScan 37 % Format Specifiers Reference Drawer -->
+            <details class="specifiers-drawer">
+              <summary>📖 ProScan % Format Specifiers Reference (37 Supported Tokens)</summary>
+              <div class="specifiers-grid" id="specifiersGrid"></div>
+            </details>
           </div>
         </div>
 
-        <h3 style="font-size: 14px; margin-top: 16px; margin-bottom: 12px; color: var(--violet-accent);">Scanner B Settings</h3>
-        <div class="rule-grid">
-          <div class="form-group">
-            <label>Radio Model (34 Catalog)</label>
-            <select id="cfg_model_b" class="form-select" onchange="updateBaudOptions('b')"></select>
-          </div>
-          <div class="form-group">
-            <label>Connection Mode</label>
-            <select id="cfg_mode_b" class="form-select" onchange="toggleConnectionModeUI('b')">
-              <option value="SERIAL">Serial COM Port</option>
-              <option value="IP">IP Sockets / ser2net</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <label id="lbl_port_b">Available COM Port</label>
-              <button type="button" onclick="refreshComPorts()" style="background: none; border: none; color: var(--violet-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Ports</button>
-            </div>
-            <select id="cfg_port_b" class="form-select"></select>
-            <input type="text" id="cfg_custom_port_b" class="form-input" style="display: none; margin-top: 6px;" placeholder="e.g. 192.168.1.50 or COM5">
-          </div>
-          <div class="form-group">
-            <label>Baud Rate</label>
-            <select id="cfg_baud_b" class="form-select"></select>
-          </div>
-          <div class="form-group">
-            <label>Lockout / Skip Method</label>
-            <select id="cfg_lockout_b" class="form-select">
-              <option value="KEYPRESS">KEYPRESS (Immediate Skip / Avoid)</option>
-              <option value="MEMORY">MEMORY (Temporary Channel Lockout)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <label>Audio Input Device</label>
-              <button type="button" onclick="loadAudioDevices()" style="background: none; border: none; color: var(--violet-accent); font-size: 11px; font-weight: 600; cursor: pointer;">🔄 Refresh Audio</button>
-            </div>
-            <select id="cfg_audio_dev_b" class="form-select"></select>
-          </div>
-          <div class="form-group">
-            <label>Audio Channel</label>
-            <select id="cfg_audio_ch_b" class="form-select">
-              <option value="MONO">Mono / All Channels</option>
-              <option value="LEFT">Left Channel (Stereo Splitter)</option>
-              <option value="RIGHT">Right Channel (Stereo Splitter)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Filename Template Pattern</label>
-            <input type="text" id="cfg_filename_template_b" class="form-input" placeholder="%DT - %S - %C (%TG)" oninput="updateTemplatePreviews()">
-            <div class="preset-row">
-              <button type="button" class="preset-chip" onclick="applyTemplatePreset('b', '%DT - %S - %C (%TG)', '%C (%TG)')">ProScan Default</button>
-              <button type="button" class="preset-chip" onclick="applyTemplatePreset('b', '%C_%TG_%F', '%C')">Simple</button>
-              <button type="button" class="preset-chip" onclick="applyTemplatePreset('b', '%Y-%M-%D_%H%N%S_%S_%G_%C_%TG', '%S - %G - %C (%TG)')">Detailed</button>
-              <button type="button" class="preset-chip" onclick="applyTemplatePreset('b', '%G - %C (%TF)', '%G: %C')">Dept/Chan</button>
-            </div>
-            <div class="template-preview" id="preview_fn_b">Preview: --</div>
-          </div>
-          <div class="form-group">
-            <label>TIT2 (Title) Tag Pattern</label>
-            <input type="text" id="cfg_tit2_template_b" class="form-input" placeholder="%C (%TG)" oninput="updateTemplatePreviews()">
-            <div class="template-preview" id="preview_tit2_b">TIT2: --</div>
-          </div>
-        </div>
-
-        <h3 style="font-size: 14px; margin-top: 16px; margin-bottom: 12px; color: var(--emerald-recv);">📡 ScanScribe Pipeline Feeder Settings</h3>
-        <div class="rule-grid">
-          <div class="form-group">
-            <label>Feeder Ingest Mode</label>
-            <select id="cfg_feeder_mode" class="form-select">
-              <option value="DIRECTORY_DROP">ScanScribe Inbox Directory Drop</option>
-              <option value="HTTP_WEBHOOK">ScanScribe HTTP Webhook POST</option>
-              <option value="LIVE_STREAM">Live Stream Only (No File Dispatch)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Audio File Format</label>
-            <select id="cfg_feeder_format" class="form-select" onchange="updateTemplatePreviews()">
-              <option value="WAV" selected>WAV Audio (RIFF LIST + pros Chunk)</option>
-              <option value="MP3">MP3 Audio (ID3v2.3 + pros Chunk)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Samples Per Second</label>
-            <select id="cfg_feeder_sample_rate" class="form-select">
-              <option value="8000">8000 Hz</option>
-              <option value="11025">11025 Hz</option>
-              <option value="16000" selected>16000 Hz (Whisper Optimal)</option>
-              <option value="22050">22050 Hz</option>
-              <option value="44100">44100 Hz</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>ScanScribe Inbox Watch Directory Path</label>
-            <input type="text" id="cfg_feeder_inbox" class="form-input" value="A:\Scanscribe_Projects\scanscribe\inbox">
-          </div>
-          <div class="form-group">
-            <label>ScanScribe HTTP Webhook URL</label>
-            <input type="text" id="cfg_feeder_webhook" class="form-input" value="http://127.0.0.1:5000/api/ingest">
-          </div>
-          <div class="form-group" style="justify-content: center; gap: 10px;">
-            <label class="mini-toggle">
-              <input type="checkbox" id="cfg_feeder_proscan_tags" checked>
-              <span>Embed Binary ProScan Tags (pros + ID3/RIFF)</span>
-            </label>
-            <label class="mini-toggle">
-              <input type="checkbox" id="cfg_feeder_sidecar_json" checked>
-              <span>Write Companion .json Sidecar Metadata</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- ProScan 37 % Format Specifiers Reference Drawer -->
-        <details class="specifiers-drawer">
-          <summary>📖 ProScan % Format Specifiers Reference (37 Supported Tokens)</summary>
-          <div class="specifiers-grid" id="specifiersGrid"></div>
-        </details>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px;">
-          <div style="display: flex; gap: 8px;">
-            <button type="button" class="btn btn-outline" style="color: var(--cyan-accent);" onclick="testScanScribeFeeder('scanner_a')">📡 Test Scanner A</button>
-            <button type="button" class="btn btn-outline" style="color: var(--violet-accent);" onclick="testScanScribeFeeder('scanner_b')">📡 Test Scanner B</button>
-          </div>
-          <div style="display: flex; gap: 12px;">
-            <button type="button" class="btn btn-outline" onclick="closeSettingsModal()">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save &amp; Apply</button>
-          </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeSettingsModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save &amp; Apply</button>
         </div>
       </form>
     </div>

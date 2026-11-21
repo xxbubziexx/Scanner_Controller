@@ -14,8 +14,8 @@ pub use classic::{parse_classic_response, ClassicDriver};
 pub use dma::{parse_dma_response, DmaDriver, DMA_POLL_COMMAND};
 pub use error::DriverError;
 pub use factory::{
-    create_driver_for_model, create_hardware_driver, driver_family_for_model, AnyScannerDriver,
-    DriverFamily, HardwareTransport,
+    create_driver_for_model, create_hardware_driver, driver_family_for_model,
+    poll_slot_with_autodetect, AnyScannerDriver, DriverFamily, HardwareTransport,
 };
 pub use hp::{
     clean_display_text, parse_hp_response, parse_sts_fallback, HpDriver, HP_POLL_COMMAND,
@@ -222,5 +222,28 @@ mod tests {
         let sent = driver.transport().sent_commands();
         assert!(!sent.contains(&"KEY,S,P".to_string()));
         assert_eq!(sent, &["KEY,>,P", "KEY,>, P", "KEY,Z,P", "KEY,Z,P"]);
+    }
+
+    #[test]
+    fn test_autodetect_upgrades_driver_family_in_place() {
+        // Configure as DMA (BCD996P2), but connected radio identifies itself as HomePatrol (BCD436HP)
+        let cfg = make_config("scanner_a", ScannerModel::BCD996P2, "COM5");
+        let hp_reply = concat!(
+            "MDL,BCD436HP\r",
+            "STS,001100,,\r",
+            "GLG,10401,NFM,,0,County,Fire,Dispatch 1,1,,,,,0\r"
+        );
+        let replay = ReplayTransport::from_responses([hp_reply]);
+        let mut slot = Some(create_driver_for_model(cfg, replay));
+        assert_eq!(slot.as_ref().unwrap().family(), DriverFamily::XtDma);
+
+        let (status, changed_model) = poll_slot_with_autodetect(&mut slot).unwrap();
+        assert_eq!(changed_model, Some(ScannerModel::BCD436HP));
+        assert_eq!(status.model, "BCD436HP");
+        assert_eq!(slot.as_ref().unwrap().family(), DriverFamily::HomePatrolSds);
+        assert_eq!(
+            slot.as_ref().unwrap().config().model,
+            ScannerModel::BCD436HP
+        );
     }
 }

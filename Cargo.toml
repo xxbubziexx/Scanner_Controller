@@ -17,7 +17,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.85"
 authors = ["Scanner_Controller Contributors"]
 license = "MIT OR Apache-2.0"
 
@@ -44,7 +44,7 @@ quick-xml = "0.37"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 clap = { version = "4.5", features = ["derive"] }
-cpal = "0.15"
+cpal = "0.18"
 rtrb = "0.3"
 rubato = "0.16"
 hound = "3.5"
