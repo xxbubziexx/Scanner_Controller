@@ -56,6 +56,23 @@ fn round_freq(f: f64) -> f64 {
     (f * 100_000.0).round() / 100_000.0
 }
 
+/// A single live row captured from a Uniden scanner's `STS` LCD buffer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DisplayLine {
+    /// Printable row text preserving fixed-width column positions.
+    pub text: String,
+    /// Per-character `STS` attribute mask (omitted when all normal or full divider):
+    /// `'*'` = reverse video, `'_'` = underline, `'#'` = reverse + underline, `' '` = normal.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub mode: String,
+    /// True when `DISP_FORM` marks this row as large / double-height (`'1'`).
+    #[serde(default)]
+    pub large: bool,
+    /// True when `Ln_MODE` represents a full-width horizontal divider bar (`____...`).
+    #[serde(default)]
+    pub underline_divider: bool,
+}
+
 /// Represents the instantaneous operational state of a physical scanner radio.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::struct_excessive_bools)]
@@ -82,6 +99,8 @@ pub struct ScannerStatus {
     pub avoided: bool,
     #[serde(default)]
     pub last_update: f64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub display_lines: Vec<DisplayLine>,
     #[serde(default, skip_serializing)]
     pub mute_state: bool,
 }
@@ -112,6 +131,7 @@ impl ScannerStatus {
             status_line: "SCANNING".to_string(),
             avoided: false,
             last_update: 0.0,
+            display_lines: Vec::new(),
             mute_state: false,
         }
     }

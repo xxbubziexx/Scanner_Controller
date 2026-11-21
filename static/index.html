@@ -77,9 +77,12 @@
 
       <div id="cardActiveBodyA">
         <div class="lcd-display">
-          <div class="lcd-sys" id="sysA">Scanning...</div>
-          <div class="lcd-dept" id="deptA"></div>
-          <div class="lcd-channel" id="chanA">Scanning...</div>
+          <div class="lcd-mirror" id="lcdScreenA" style="display: none;" aria-label="Scanner A Live LCD"></div>
+          <div class="lcd-fallback" id="lcdFallbackA">
+            <div class="lcd-sys" id="sysA">Scanning...</div>
+            <div class="lcd-dept" id="deptA"></div>
+            <div class="lcd-channel" id="chanA">Scanning...</div>
+          </div>
           <div class="lcd-meta-row">
             <div class="meta-item"><span>TGID:</span> <strong id="tgidA">--</strong></div>
             <div class="meta-item"><span>FREQ:</span> <strong id="freqA">-- MHz</strong></div>
@@ -144,9 +147,12 @@
 
       <div id="cardActiveBodyB">
         <div class="lcd-display">
-          <div class="lcd-sys" id="sysB">Scanning...</div>
-          <div class="lcd-dept" id="deptB"></div>
-          <div class="lcd-channel" id="chanB">Scanning...</div>
+          <div class="lcd-mirror" id="lcdScreenB" style="display: none;" aria-label="Scanner B Live LCD"></div>
+          <div class="lcd-fallback" id="lcdFallbackB">
+            <div class="lcd-sys" id="sysB">Scanning...</div>
+            <div class="lcd-dept" id="deptB"></div>
+            <div class="lcd-channel" id="chanB">Scanning...</div>
+          </div>
           <div class="lcd-meta-row">
             <div class="meta-item"><span>TGID:</span> <strong id="tgidB">--</strong></div>
             <div class="meta-item"><span>FREQ:</span> <strong id="freqB">-- MHz</strong></div>

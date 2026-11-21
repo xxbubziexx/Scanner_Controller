@@ -7,7 +7,9 @@ use std::time::{Duration, Instant};
 use sc_core::{ScannerConfig, ScannerStatus};
 use tracing::{error, info, warn};
 
-use crate::parse_util::{extract_section, now_unix_seconds, set_inactive_status};
+use crate::parse_util::{
+    extract_section, now_unix_seconds, set_inactive_status, update_sts_display_lines,
+};
 use crate::transport::Transport;
 
 /// Pure deterministic parser for Uniden Classic `STS` / `STC` responses.
@@ -15,6 +17,8 @@ pub fn parse_classic_response(res: &str, status: &mut ScannerStatus) {
     if res.trim().is_empty() {
         return;
     }
+
+    update_sts_display_lines(res, status);
 
     let parts: Vec<&str> = if res.contains(',') {
         res.split(',').collect()
@@ -221,6 +225,7 @@ impl<T: Transport> ClassicDriver<T> {
     /// Disconnects the underlying transport.
     pub fn disconnect(&mut self) {
         self.status.connected = false;
+        self.status.display_lines.clear();
         self.transport.disconnect();
     }
 
@@ -233,6 +238,7 @@ impl<T: Transport> ClassicDriver<T> {
             Err(e) => {
                 error!(scanner_id = %self.config.id, error = %e, "Error communicating with Classic scanner");
                 self.status.connected = false;
+                self.status.display_lines.clear();
                 String::new()
             }
         }

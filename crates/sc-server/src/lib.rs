@@ -100,15 +100,11 @@ fn sync_device_name_and_index(
 
     if let Some(ref target_name) = *name {
         let lower = target_name.to_ascii_lowercase();
-        if let Some(dev) = devices
-            .iter()
-            .find(|d| d.name == *target_name)
-            .or_else(|| {
-                devices
-                    .iter()
-                    .find(|d| d.name.to_ascii_lowercase().contains(&lower))
-            })
-        {
+        if let Some(dev) = devices.iter().find(|d| d.name == *target_name).or_else(|| {
+            devices
+                .iter()
+                .find(|d| d.name.to_ascii_lowercase().contains(&lower))
+        }) {
             if let Ok(idx_u32) = u32::try_from(dev.index) {
                 *index = Some(idx_u32);
             }
@@ -137,11 +133,9 @@ fn enrich_scanner_model_from_ports(
     let port_canon = std::fs::canonicalize(port_trim).ok();
     let matched = ports.iter().find(|p| {
         p.device.eq_ignore_ascii_case(port_trim)
-            || port_canon.as_ref().is_some_and(|pc| {
-                std::fs::canonicalize(&p.device)
-                    .ok()
-                    .is_some_and(|pd| &pd == pc)
-            })
+            || port_canon
+                .as_ref()
+                .is_some_and(|pc| std::fs::canonicalize(&p.device).is_ok_and(|pd| &pd == pc))
     });
     if let Some(info) = matched {
         if let Some(ref model_str) = info.detected_model {
@@ -405,10 +399,9 @@ pub struct RefreshQuery {
 
 async fn handle_audio_devices(Query(query): Query<RefreshQuery>) -> Json<Value> {
     let force = query.refresh.unwrap_or(false);
-    let devices =
-        tokio::task::spawn_blocking(move || list_audio_input_devices_cached(force))
-            .await
-            .unwrap_or_default();
+    let devices = tokio::task::spawn_blocking(move || list_audio_input_devices_cached(force))
+        .await
+        .unwrap_or_default();
     Json(json!({
         "status": "success",
         "devices": devices
@@ -417,10 +410,9 @@ async fn handle_audio_devices(Query(query): Query<RefreshQuery>) -> Json<Value> 
 
 async fn handle_audio_output_devices(Query(query): Query<RefreshQuery>) -> Json<Value> {
     let force = query.refresh.unwrap_or(false);
-    let devices =
-        tokio::task::spawn_blocking(move || list_audio_output_devices_cached(force))
-            .await
-            .unwrap_or_default();
+    let devices = tokio::task::spawn_blocking(move || list_audio_output_devices_cached(force))
+        .await
+        .unwrap_or_default();
     Json(json!({
         "status": "success",
         "devices": devices

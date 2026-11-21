@@ -7,7 +7,9 @@ use std::time::{Duration, Instant};
 use sc_core::{normalize_frequency, ScannerConfig, ScannerStatus};
 use tracing::{error, info, warn};
 
-use crate::parse_util::{extract_section, now_unix_seconds, set_inactive_status};
+use crate::parse_util::{
+    extract_section, now_unix_seconds, set_inactive_status, update_sts_display_lines,
+};
 use crate::transport::Transport;
 
 /// Pipelined multi-command poll string for DMA series scanners (`RadioSpecific.cs:1042`).
@@ -19,6 +21,8 @@ pub fn parse_dma_response(res: &str, status: &mut ScannerStatus) {
     if res.trim().is_empty() {
         return;
     }
+
+    update_sts_display_lines(res, status);
 
     // 1. Model identification (MDL,)
     if let Some(mdl) = extract_section(res, "MDL,") {
@@ -317,6 +321,7 @@ impl<T: Transport> DmaDriver<T> {
     /// Disconnects the underlying transport.
     pub fn disconnect(&mut self) {
         self.status.connected = false;
+        self.status.display_lines.clear();
         self.transport.disconnect();
     }
 
@@ -329,6 +334,7 @@ impl<T: Transport> DmaDriver<T> {
             Err(e) => {
                 error!(scanner_id = %self.config.id, error = %e, "Error communicating with DMA scanner");
                 self.status.connected = false;
+                self.status.display_lines.clear();
                 String::new()
             }
         }

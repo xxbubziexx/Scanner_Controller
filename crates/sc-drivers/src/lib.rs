@@ -20,7 +20,9 @@ pub use factory::{
 pub use hp::{
     clean_display_text, parse_hp_response, parse_sts_fallback, HpDriver, HP_POLL_COMMAND,
 };
-pub use parse_util::extract_section;
+pub use parse_util::{
+    clean_lcd_row_preserving_columns, extract_section, extract_section_raw, parse_sts_display_lines,
+};
 pub use transport::{
     normalize_port_name, ReplayTransport, SerialTransport, TcpTransport, Transport, UdpTransport,
 };
@@ -245,5 +247,86 @@ mod tests {
             slot.as_ref().unwrap().config().model,
             ScannerModel::BCD436HP
         );
+    }
+
+    #[test]
+    fn test_sts_live_lcd_display_parsing() {
+        // 1. Full 14-line BCD436HP STS hold screen
+        let sample_sts_hold = concat!(
+            "STS,00110110110000, F0:---------9 17:29    ,, S0:--2------- Sep23    ,",
+            "________________________,Medical Helicopters /   ,,EMS Agencies (Area Wide),,Statewide               ,",
+            "________________________,Air Methods - ARCH      ,,Helicopter              ,,                        ,",
+            "________________________,ARCH Dispatch - St Louis,,                        ,,  461.5250MHz\x0f\x10\x0e\x0bC192.8 ,",
+            ",EMS Dispatch        ,________________________,                      ,,Tag:--.--.---         ,,0,1,0,0,,,0,OFF,0"
+        );
+        let lines = parse_sts_display_lines(sample_sts_hold);
+        assert_eq!(lines.len(), 14);
+        let expected_large = [
+            false, false, true, true, false, true, true, false, true, true, false, false, false,
+            false,
+        ];
+        for (idx, &exp) in expected_large.iter().enumerate() {
+            assert_eq!(lines[idx].large, exp, "row {idx} large flag mismatch");
+        }
+        assert!(!lines[0].underline_divider);
+        assert!(lines[1].underline_divider);
+        assert!(lines[4].underline_divider);
+        assert!(lines[7].underline_divider);
+        assert!(lines[11].underline_divider);
+        assert_eq!(lines[2].text, "Medical Helicopters /   ");
+        assert_eq!(lines[8].text, "ARCH Dispatch - St Louis");
+        assert_eq!(lines[10].text, "  461.5250MHz    C192.8 ");
+        assert_eq!(lines[13].text, "Tag:--.--.---         ");
+
+        // 2. Reverse-video ('*', '#') highlights + unescaped comma in alpha tag
+        let sts_highlight = concat!(
+            "STS,010,Top Bar,   ****,St. Francois, MO        ,################        ,",
+            "Bottom Normal,"
+        );
+        let hl_lines = parse_sts_display_lines(sts_highlight);
+        assert_eq!(hl_lines.len(), 3);
+        assert_eq!(hl_lines[0].mode, "   ****");
+        assert!(!hl_lines[0].large);
+        assert_eq!(hl_lines[1].text, "St. Francois, MO        ");
+        assert_eq!(hl_lines[1].mode, "################        ");
+        assert!(hl_lines[1].large);
+        assert_eq!(hl_lines[2].text, "Bottom Normal");
+        assert_eq!(hl_lines[2].mode, "");
+
+        // 3. Pipelined HP idle scanning response populates display_lines even while receiving == false
+        let hp_idle = concat!(
+            "MDL,BCD436HP\r",
+            "STS,001101, F0:01------- 13:45    ,, S0:1--------- Nov21    ,________________________,",
+            "St. Francois County     ,,Fire Agencies           ,,ID Scan                 ,\r",
+            "GLG,,,,,,,,,\r",
+            "PWR,-999,0\r",
+            "GSI,<XML>,<ScannerInfo/></ScannerInfo>\r"
+        );
+        let cfg_hp = make_config("scanner_a", ScannerModel::BCD436HP, "COM5");
+        let mut drv_hp = HpDriver::new(cfg_hp, ReplayTransport::from_responses([hp_idle]));
+        let st_hp = drv_hp.poll().clone();
+        assert!(!st_hp.receiving);
+        assert_eq!(st_hp.display_lines.len(), 5);
+        assert_eq!(st_hp.display_lines[2].text, "St. Francois County     ");
+        assert_eq!(st_hp.display_lines[4].text, "ID Scan                 ");
+
+        // 4. Pipelined DMA response populates display_lines
+        let dma_idle = concat!(
+            "MDL,BCD996P2\r",
+            "STS,0110,F0:---------9 17:29    ,,County Fire System      ,****************        ,",
+            "Scanning...             ,,                        ,\r",
+            "GLG,,,,0,,,,0,,,,,0\r",
+            "VOL,12\rSQL,2\rPWR,0,0\r"
+        );
+        let cfg_dma = make_config("scanner_b", ScannerModel::BCD996P2, "COM6");
+        let mut drv_dma = DmaDriver::new(cfg_dma, ReplayTransport::from_responses([dma_idle]));
+        let st_dma = drv_dma.poll().clone();
+        assert!(!st_dma.receiving);
+        assert_eq!(st_dma.display_lines.len(), 4);
+        assert_eq!(st_dma.display_lines[1].text, "County Fire System      ");
+        assert_eq!(st_dma.display_lines[1].mode, "****************        ");
+
+        // 5. Stub/empty STS returns empty Vec
+        assert_eq!(parse_sts_display_lines("STS,001100,,"), Vec::new());
     }
 }

@@ -499,6 +499,7 @@ fn mark_status_disabled(status: &mut ScannerStatus) {
     status.system_name.clear();
     status.dept_name.clear();
     status.channel_name.clear();
+    status.display_lines.clear();
     status.status_line = "DISABLED".to_string();
 }
 
@@ -778,11 +779,12 @@ impl<T: Transport + 'static> SyncManager<T> {
     /// and restarting audio streams only if audio devices, channels, loopback, or enable flags changed.
     #[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
     pub fn update_config(&self, new_config: AppConfig) {
-        let (driver_a_changed, driver_b_changed, audio_restart_needed) =
+        let (rebuild_primary, rebuild_secondary, audio_restart_needed) =
             self.config.lock().map_or((true, true, true), |old| {
                 let da = scanner_driver_settings_changed(&old.scanner_a, &new_config.scanner_a);
                 let db = scanner_driver_settings_changed(&old.scanner_b, &new_config.scanner_b);
-                let audio = old.scanner_a.audio_device_index != new_config.scanner_a.audio_device_index
+                let audio = old.scanner_a.audio_device_index
+                    != new_config.scanner_a.audio_device_index
                     || old.scanner_a.audio_device_name != new_config.scanner_a.audio_device_name
                     || old.scanner_a.audio_channel != new_config.scanner_a.audio_channel
                     || (old.scanner_a.enabled && old.scanner_a.audio_enabled)
@@ -804,7 +806,7 @@ impl<T: Transport + 'static> SyncManager<T> {
             *cfg = new_config.clone();
         }
 
-        if driver_a_changed {
+        if rebuild_primary {
             if let Ok(mut guard_a) = self.scanner_a.lock() {
                 if let Some(old_drv) = guard_a.as_mut() {
                     old_drv.disconnect();
@@ -825,7 +827,7 @@ impl<T: Transport + 'static> SyncManager<T> {
             }
         }
 
-        if driver_b_changed {
+        if rebuild_secondary {
             if let Ok(mut guard_b) = self.scanner_b.lock() {
                 if let Some(old_drv) = guard_b.as_mut() {
                     old_drv.disconnect();
@@ -1390,8 +1392,8 @@ mod tests {
         assert!(snap.scanner_a.connected);
         assert!(!snap.scanner_b.connected);
         assert_eq!(snap.scanner_b.status_line, "DISABLED");
-        assert!(snap.scanner_b.system_name.is_empty());
-        assert!(snap.scanner_b.channel_name.is_empty());
+        assert_eq!(snap.scanner_b.system_name, "");
+        assert_eq!(snap.scanner_b.channel_name, "");
     }
 
     #[test]

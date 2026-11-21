@@ -394,3 +394,21 @@ This living document is the **shared memory** between AI models, human developer
   - Unused manifest dependency warnings remain for workspace `byteorder` (`Cargo.toml`) and `thiserror` (`crates/sc-metadata/Cargo.toml`) on Linux builds.
   - Note VM 123 production `config.json` currently uses PulseAudio defaults cleanly (`Audio Adapter (Unitek Y-247A) Mono` input and `Uniden_Sink` loopback output); opening Settings and clicking Save & Apply in the Web UI will persist explicit device names (`audio_device_name` / `output_device_name`).
 - **Next Tasks / Unfinished Work:** None; VM 123 production verification complete.
+
+### 2026-11-21 13:54 | Claude / Antigravity (Windows Dev Workstation)
+- **Phase:** Feature Enhancement — ProScan-style Live LCD Mirror (`STS` Parsing)
+- **Work Performed:**
+  - Added [`DisplayLine`](crates/sc-core/src/status.rs) and optional `display_lines: Vec<DisplayLine>` (`skip_serializing_if = "Vec::is_empty"`) on `ScannerStatus` in [`crates/sc-core/src/status.rs`](crates/sc-core/src/status.rs) and re-exported from [`crates/sc-core/src/lib.rs`](crates/sc-core/src/lib.rs).
+  - Implemented `extract_section_raw`, `clean_lcd_row_preserving_columns`, `parse_sts_display_lines`, and `update_sts_display_lines` in [`crates/sc-drivers/src/parse_util.rs`](crates/sc-drivers/src/parse_util.rs), handling `DISP_FORM` font sizing, reverse-video/underline attribute masks (`*`, `_`, `#`), horizontal dividers (`____...`), unescaped alpha-tag commas, and non-printable icon byte spacing.
+  - Wired `update_sts_display_lines` into [`crates/sc-drivers/src/hp.rs`](crates/sc-drivers/src/hp.rs), [`crates/sc-drivers/src/dma.rs`](crates/sc-drivers/src/dma.rs), and [`crates/sc-drivers/src/classic.rs`](crates/sc-drivers/src/classic.rs) so `STS` screen lines populate continuously on every poll (while preserving `GLG`/`GSI`/`PWR` recording/exclusion metadata); cleared `display_lines` on disconnect/error/inactive/disabled transitions (`set_inactive_status` and `mark_status_disabled` in [`crates/sc-engine/src/lib.rs`](crates/sc-engine/src/lib.rs)).
+  - Added `test_sts_live_lcd_display_parsing` in [`crates/sc-drivers/src/lib.rs`](crates/sc-drivers/src/lib.rs).
+  - Added ProScan-style live LCD mirror rendering (`renderLcdMirror`) in [`static/index.html`](static/index.html), [`static/style.css`](static/style.css), and [`static/app.js`](static/app.js), falling back cleanly to system/channel placeholders when disconnected or empty.
+- **Intentional Behaviour Deviations from Python:** Web UI replaces idle `"Scanning..."` placeholders with the scanner's live `STS` LCD buffer whenever connected and populated (`Option 1`).
+- **Live Capture Impact:** Windows dev verification complete; pending VM 123 deployment and live BCD436HP `STS` verification.
+- **Verification Performed:**
+  - `cargo fmt --all -- --check`: clean (0 diffs).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: 0 warnings.
+  - `cargo test --workspace --no-fail-fast`: all 46 tests passed (`sc-audio`: 9, `sc-core`: 7, `sc-desktop`: 2, `sc-discovery`: 6, `sc-drivers`: 8, `sc-engine`: 4, `sc-feeder`: 3, `sc-metadata`: 5, `sc-server`: 2).
+- **Gotchas / Warnings for Next Model:**
+  - `#[serde(default, skip_serializing_if = "Vec::is_empty")]` must stay on `ScannerStatus::display_lines` so disconnected initial state matches `fixtures/api/initial_state.json`.
+- **Next Tasks / Unfinished Work:** Push to `origin/rust`, deploy to VM 123, and verify live BCD436HP `display_lines` in `/api/state`.

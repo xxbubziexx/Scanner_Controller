@@ -438,6 +438,98 @@ function renderActiveHolds(activeExclusions) {
   bar.innerHTML = `<span style="color: var(--text-muted); font-weight: 600;">Active Holds (${keys.length}):</span> ${pills}`;
 }
 
+function renderLcdMirror(containerEl, displayLines) {
+  const key = JSON.stringify(displayLines);
+  if (containerEl.dataset.lastLcdKey === key) {
+    return;
+  }
+  containerEl.dataset.lastLcdKey = key;
+
+  const fragment = document.createDocumentFragment();
+  let lastWasDivider = true;
+
+  for (const line of displayLines) {
+    const text = typeof line.text === "string" ? line.text : "";
+    const mode = typeof line.mode === "string" ? line.mode : "";
+    const hasText = text.trim().length > 0;
+    const hasModeHighlight = mode.includes("*") || mode.includes("#");
+
+    if (!hasText && !hasModeHighlight) {
+      if (line.underline_divider && !lastWasDivider) {
+        const divEl = document.createElement("div");
+        divEl.className = "lcd-divider";
+        fragment.appendChild(divEl);
+        lastWasDivider = true;
+      }
+      continue;
+    }
+
+    const rowEl = document.createElement("div");
+    rowEl.className = "lcd-row";
+    if (line.large) {
+      rowEl.classList.add("lcd-row-large");
+    }
+    if (line.underline_divider) {
+      rowEl.classList.add("lcd-row-divider");
+    }
+
+    if (!mode) {
+      rowEl.textContent = text.trimEnd();
+    } else {
+      let effectiveLen = Math.max(text.length, mode.length);
+      while (effectiveLen > 0) {
+        const tc = effectiveLen <= text.length ? text[effectiveLen - 1] : " ";
+        const mc = effectiveLen <= mode.length ? mode[effectiveLen - 1] : " ";
+        if (tc === " " && mc !== "*" && mc !== "#" && mc !== "_") {
+          effectiveLen -= 1;
+        } else {
+          break;
+        }
+      }
+
+      let runText = "";
+      let runCls = null;
+      const flushRun = () => {
+        if (!runText) return;
+        if (runCls) {
+          const span = document.createElement("span");
+          span.className = runCls;
+          span.textContent = runText;
+          rowEl.appendChild(span);
+        } else {
+          rowEl.appendChild(document.createTextNode(runText));
+        }
+        runText = "";
+      };
+
+      for (let i = 0; i < effectiveLen; i += 1) {
+        const ch = i < text.length ? text[i] : " ";
+        const m = i < mode.length ? mode[i] : " ";
+        let cls = "";
+        if (m === "*") cls = "lcd-inv";
+        else if (m === "#") cls = "lcd-inv-ul";
+        else if (m === "_") cls = "lcd-ul";
+
+        if (runCls !== null && cls !== runCls) {
+          flushRun();
+        }
+        runCls = cls;
+        runText += ch;
+      }
+      flushRun();
+    }
+
+    fragment.appendChild(rowEl);
+    lastWasDivider = Boolean(line.underline_divider);
+  }
+
+  if (fragment.lastChild && fragment.lastChild.classList && fragment.lastChild.classList.contains("lcd-divider")) {
+    fragment.removeChild(fragment.lastChild);
+  }
+
+  containerEl.replaceChildren(fragment);
+}
+
 function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioLevelPct) {
   const card = document.getElementById(`card${suffix}`);
   const badge = document.getElementById(`badge${suffix}`);
@@ -445,6 +537,8 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
   const recBadge = document.getElementById(`recBadge${suffix}`);
   const modelBadge = document.getElementById(`cardModelBadge${suffix}`);
 
+  const lcdScreen = document.getElementById(`lcdScreen${suffix}`);
+  const lcdFallback = document.getElementById(`lcdFallback${suffix}`);
   const sysEl = document.getElementById(`sys${suffix}`);
   const deptEl = document.getElementById(`dept${suffix}`);
   const chanEl = document.getElementById(`chan${suffix}`);
@@ -487,9 +581,25 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
   if (disabledNotice) disabledNotice.style.display = isDisabled ? "block" : "none";
   card.style.opacity = isDisabled ? "0.6" : "1";
 
-  sysEl.innerText = data.system_name || idleText;
-  deptEl.innerText = data.dept_name || "";
-  chanEl.innerText = data.channel_name || idleText;
+  const hasLiveLcd = !isDisabled
+    && data.connected
+    && Array.isArray(data.display_lines)
+    && data.display_lines.length > 0;
+
+  if (hasLiveLcd && lcdScreen) {
+    lcdScreen.style.display = "flex";
+    if (lcdFallback) lcdFallback.style.display = "none";
+    renderLcdMirror(lcdScreen, data.display_lines);
+  } else {
+    if (lcdScreen) {
+      lcdScreen.style.display = "none";
+      lcdScreen.dataset.lastLcdKey = "";
+    }
+    if (lcdFallback) lcdFallback.style.display = "";
+    sysEl.innerText = data.system_name || idleText;
+    deptEl.innerText = data.dept_name || "";
+    chanEl.innerText = data.channel_name || idleText;
+  }
   tgidEl.innerText = data.tgid || "--";
   freqEl.innerText = data.frequency ? `${data.frequency.toFixed(4)} MHz` : "-- MHz";
   modEl.innerText = data.modulation || "NFM";

@@ -11,7 +11,9 @@ use quick_xml::Reader;
 use sc_core::{normalize_frequency, ScannerConfig, ScannerStatus};
 use tracing::{debug, error, info, warn};
 
-use crate::parse_util::{extract_section, now_unix_seconds, set_inactive_status};
+use crate::parse_util::{
+    extract_section, now_unix_seconds, set_inactive_status, update_sts_display_lines,
+};
 use crate::transport::Transport;
 
 /// Pipelined multi-command poll string for `HomePatrol` / SDS series scanners (`RadioSpecific.cs:1055`).
@@ -87,6 +89,7 @@ fn find_tgid_in_text(text: &str) -> Option<String> {
 /// Parses an LCD screen `STS` response when `GLG` or `GSI` XML are unavailable (`drivers/bcd436hp.py:137`).
 #[allow(clippy::too_many_lines)]
 pub fn parse_sts_fallback(res: &str, status: &mut ScannerStatus) {
+    update_sts_display_lines(res, status);
     let parts: Vec<&str> = res.split(',').map(str::trim).collect();
     let dividers: Vec<usize> = parts
         .iter()
@@ -211,6 +214,8 @@ pub fn parse_hp_response(res: &str, status: &mut ScannerStatus) {
     if res.trim().is_empty() {
         return;
     }
+
+    update_sts_display_lines(res, status);
 
     // 1. Model identification (MDL,)
     if let Some(mdl) = extract_section(res, "MDL,") {
@@ -589,6 +594,7 @@ impl<T: Transport> HpDriver<T> {
     /// Disconnects the underlying transport.
     pub fn disconnect(&mut self) {
         self.status.connected = false;
+        self.status.display_lines.clear();
         self.transport.disconnect();
     }
 
@@ -601,6 +607,7 @@ impl<T: Transport> HpDriver<T> {
             Err(e) => {
                 error!(scanner_id = %self.config.id, error = %e, "Error communicating with HomePatrol/SDS scanner");
                 self.status.connected = false;
+                self.status.display_lines.clear();
                 String::new()
             }
         }

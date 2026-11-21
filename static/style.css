@@ -394,6 +394,72 @@ select.badge-model-select option {
   text-overflow: ellipsis;
 }
 
+.lcd-mirror {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 148px;
+  margin-bottom: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.2px;
+}
+
+.lcd-row {
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 1.38;
+  color: #9ec5e8;
+  min-height: 1.38em;
+}
+
+.lcd-row-large {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.35;
+}
+
+.lcd-row-divider {
+  border-bottom: 1px solid rgba(56, 189, 248, 0.28);
+  padding-bottom: 4px;
+  margin-bottom: 3px;
+}
+
+.lcd-divider {
+  height: 1px;
+  background: rgba(56, 189, 248, 0.28);
+  margin: 3px 0 4px 0;
+}
+
+.lcd-inv {
+  background: #38bdf8;
+  color: #04101f;
+  font-weight: 700;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.scanner-card.receiving .lcd-inv {
+  background: #10b981;
+  color: #02140d;
+}
+
+.lcd-ul {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lcd-inv-ul {
+  background: #38bdf8;
+  color: #04101f;
+  font-weight: 700;
+  text-decoration: underline;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 .lcd-meta-row {
   display: flex;
   justify-content: space-between;

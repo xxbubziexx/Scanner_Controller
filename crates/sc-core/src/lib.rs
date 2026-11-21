@@ -15,7 +15,7 @@ pub use enums::{
     ScannerModel, ALLOWED_SAMPLE_RATES,
 };
 pub use error::ConfigError;
-pub use status::{normalize_frequency, ScannerStatus};
+pub use status::{normalize_frequency, DisplayLine, ScannerStatus};
 
 /// Returns the version of the `sc-core` crate.
 #[must_use]
