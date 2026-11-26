@@ -472,6 +472,7 @@ This living document is the **shared memory** between AI models, human developer
 - **Verification Performed:**
   - Static check: zero characters with `ord >= 0x2600` across `static/index.html`, `static/app.js`, and `static/style.css`.
   - Windows gate: `cargo fmt --all -- --check` clean, `cargo clippy --workspace --all-targets -- -D warnings` (0 warnings), `cargo test --workspace --no-fail-fast` (46 passed, 0 failed).
+  - VM 123 deploy (`09fb314`): `cargo build --release --bin scanner-controller` succeeded in `18.59s`; verified `/`, `/static/app.js`, and `/static/style.css` return `200 OK` with `Cache-Control: no-cache`, `lcd-density-dma`, `lcd-row-qk-sep`, and `.lcd-density-dma .lcd-row-large`; `GET /api/health` returned `healthy` with both `scanner_a` (`BCD436HP`, 14 display lines) and `scanner_b` (`BCD996P2`, 6 display lines) connected.
 - **Gotchas / Warnings for Next Model:**
   - None.
-- **Next Tasks / Unfinished Work:** Deploy and verify live on VM 123.
+- **Next Tasks / Unfinished Work:** None.
