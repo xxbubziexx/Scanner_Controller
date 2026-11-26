@@ -461,3 +461,17 @@ This living document is the **shared memory** between AI models, human developer
 - **Gotchas / Warnings for Next Model:**
   - None.
 - **Next Tasks / Unfinished Work:** None.
+
+### 2026-11-26 12:53 | Gemini / Antigravity (Windows Dev Workstation & VM 123 Deploy)
+- **Phase:** UI Polish — Adaptive LCD Density Scaling for 6-Row DMA (`BCD996P2`) & 8-Row (`BCD536HP`) Displays
+- **Work Performed:**
+  - Updated `renderLcdMirror` and `renderScannerCard` in [`static/app.js`](static/app.js) to apply `.lcd-density-dma` (<= 6 rows), `.lcd-density-mid` (7–10 rows), or `.lcd-density-hp` (> 10 rows) dynamically based on `display_lines.length`, and attach `.lcd-row-qk-sep` above the `S0:` quick-key row on 6-row DMA screens.
+  - Added proportional DMA (`28px`/`44px` rows, `clamp(...)` font scaling, `justify-content: space-between`) and Mid (`24px`/`32px` rows) styles inside [`static/style.css`](static/style.css) while preserving the locked `284px` bezel height (`0` vertical page bounce).
+- **Intentional Behaviour Deviations from Python:** Pure Web UI responsive LCD typography scaling for low-row-count scanners.
+- **Live Capture Impact:** Brief service restart on VM 123 during release rebuild/deploy.
+- **Verification Performed:**
+  - Static check: zero characters with `ord >= 0x2600` across `static/index.html`, `static/app.js`, and `static/style.css`.
+  - Windows gate: `cargo fmt --all -- --check` clean, `cargo clippy --workspace --all-targets -- -D warnings` (0 warnings), `cargo test --workspace --no-fail-fast` (46 passed, 0 failed).
+- **Gotchas / Warnings for Next Model:**
+  - None.
+- **Next Tasks / Unfinished Work:** Deploy and verify live on VM 123.

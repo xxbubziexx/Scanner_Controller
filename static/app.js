@@ -439,6 +439,12 @@ function renderActiveHolds(activeExclusions) {
 }
 
 function renderLcdMirror(containerEl, displayLines) {
+  const densityClass = displayLines.length <= 6
+    ? "lcd-density-dma"
+    : (displayLines.length <= 10 ? "lcd-density-mid" : "lcd-density-hp");
+  containerEl.classList.remove("lcd-density-dma", "lcd-density-mid", "lcd-density-hp");
+  containerEl.classList.add(densityClass);
+
   const key = JSON.stringify(displayLines);
   if (containerEl.dataset.lastLcdKey === key) {
     return;
@@ -447,7 +453,8 @@ function renderLcdMirror(containerEl, displayLines) {
 
   const fragment = document.createDocumentFragment();
 
-  for (const line of displayLines) {
+  for (let rowIdx = 0; rowIdx < displayLines.length; rowIdx += 1) {
+    const line = displayLines[rowIdx];
     const text = typeof line.text === "string" ? line.text : "";
     const mode = typeof line.mode === "string" ? line.mode : "";
 
@@ -458,6 +465,9 @@ function renderLcdMirror(containerEl, displayLines) {
     }
     if (line.underline_divider) {
       rowEl.classList.add("lcd-row-divider");
+    }
+    if (densityClass === "lcd-density-dma" && rowIdx === 4 && /^S\d:/.test(text.trim())) {
+      rowEl.classList.add("lcd-row-qk-sep");
     }
 
     if (!mode) {
@@ -580,6 +590,7 @@ function renderScannerCard(suffix, data, scannerCfg, masterRecordEnabled, audioL
   } else {
     if (lcdScreen) {
       lcdScreen.style.display = "none";
+      lcdScreen.classList.remove("lcd-density-dma", "lcd-density-mid", "lcd-density-hp");
       lcdScreen.dataset.lastLcdKey = "";
     }
     if (lcdFallback) lcdFallback.style.display = "";

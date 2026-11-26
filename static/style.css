@@ -480,6 +480,52 @@ input:checked + .slider:before {
   box-sizing: content-box;
 }
 
+.lcd-mirror.lcd-density-dma {
+  padding: 10px 6px;
+  justify-content: space-between;
+}
+
+.lcd-density-dma .lcd-row {
+  font-size: clamp(13px, 1.15vw, 15px);
+  height: 28px;
+  line-height: 28px;
+  letter-spacing: 0.06em;
+  color: #8db5d8;
+}
+
+.lcd-density-dma .lcd-row-large {
+  font-size: clamp(20px, 1.9vw, 26px);
+  height: 44px;
+  line-height: 44px;
+  letter-spacing: 0.04em;
+  color: #f8fafc;
+}
+
+.lcd-density-dma .lcd-row-qk-sep {
+  border-top: 1px solid rgba(56, 189, 248, 0.22);
+  padding-top: 8px;
+  margin-top: 4px;
+  box-sizing: content-box;
+}
+
+.lcd-mirror.lcd-density-mid {
+  padding: 6px 4px;
+  justify-content: space-between;
+}
+
+.lcd-density-mid .lcd-row {
+  font-size: clamp(12px, 1vw, 14px);
+  height: 24px;
+  line-height: 24px;
+  letter-spacing: 0.03em;
+}
+
+.lcd-density-mid .lcd-row-large {
+  font-size: clamp(16px, 1.35vw, 19px);
+  height: 32px;
+  line-height: 32px;
+}
+
 .lcd-inv {
   background: #38bdf8;
   color: #04101f;
